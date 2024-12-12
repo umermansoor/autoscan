@@ -3,7 +3,7 @@ import os
 from typing import List, Dict, Any, Optional, Tuple
 from openai import OpenAI
 from autoscan.image_processing import image_to_base64
-from openai.types import CompletionUsage
+from .types import ModelCompletionResult
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -52,7 +52,7 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
-    def completion(self, image_path: str, prior_page: Optional[str] = "") -> Tuple[str, CompletionUsage]:
+    def completion(self, image_path: str, prior_page: Optional[str] = "") -> ModelCompletionResult:
         """
         Generate a markdown representation of a PDF page from an image.
 
@@ -70,7 +70,15 @@ class LlmModel:
                 model=self._model_name,
                 messages=messages,
             )
-            return response.choices[0].message.content.strip(), response.usage
+            content = response.choices[0].message.content.strip()
+            usage = response.usage  # Extract token usage
+
+            # Extract required information and return a CompletionResult
+            return ModelCompletionResult(
+                page_markdown=content,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
+            )
         except Exception as err:
             logger.exception("Error while processing LLM request.")
             raise RuntimeError("Error: Unable to process request. Please try again later.") from err

@@ -3,7 +3,6 @@ import logging
 from typing import List, Optional
 from datetime import datetime
 import tempfile
-from openai.types import CompletionUsage
 
 from .image_processing import pdf_to_images
 from .model import LlmModel
@@ -109,19 +108,19 @@ def _process_images(images: List[str], model: LlmModel):
 
     for image_path in images:
         try:
-            # Call the model to get page markdown and usage details
-            page_markdown, usage = model.completion(image_path, prior_page_markdown)
-            
+            # Get the result for the current page
+            result = model.completion(image_path, prior_page_markdown)
+
             # Validate the generated markdown
-            if not page_markdown.strip():
+            if not result.page_markdown.strip():
                 raise ValueError(f"Generated markdown for image '{image_path}' is empty.")
             
-            aggregated_markdown.append(page_markdown)
-            prior_page_markdown = page_markdown  # Maintain context
+            aggregated_markdown.append(result.page_markdown)
+            prior_page_markdown = result.page_markdown  # Maintain context
 
-            # Extract tokens directly from the `usage` object
-            total_prompt_tokens += usage.prompt_tokens
-            total_completion_tokens += usage.completion_tokens
+            # Accumulate tokens
+            total_prompt_tokens += result.prompt_tokens
+            total_completion_tokens += result.completion_tokens
 
         except Exception as e:
             # Log the error and continue with the next image
@@ -133,7 +132,6 @@ def _process_images(images: List[str], model: LlmModel):
         raise RuntimeError("No valid markdown was generated from the images.")
 
     return aggregated_markdown, total_prompt_tokens, total_completion_tokens
-
 
 def _write_markdown(pdf_path: str, output_dir: str, aggregated_markdown: List[str]) -> str:
     base_name = os.path.basename(pdf_path)
