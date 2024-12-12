@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "autoscan"
+version = "0.1.0"
+description = "High quality document (PDF, Doc, etc.) to text conversion"
+authors = ["Umer Mansoor <umermk3@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pdf2image = "^1.17.0"
+litellm = "^1.54.0"
+openai = "^1.57.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

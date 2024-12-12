@@ -1,2 +1,2 @@
 # autoscan
-High Quality Documents OCR
+PDF to Markdown, yes with AI.
