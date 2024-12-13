@@ -1,7 +1,8 @@
 import logging
 import os
-from typing import List, Dict, Any, Optional, Tuple
-from openai import OpenAI
+import aiohttp
+from typing import List, Dict, Any, Optional
+from openai import AsyncOpenAI
 from autoscan.image_processing import image_to_base64
 from .types import ModelCompletionResult
 
@@ -30,7 +31,7 @@ class LlmModel:
         """
         self._model_name = model_name
         self._system_prompt = self.DEFAULT_SYSTEM_PROMPT
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @property
     def system_prompt(self) -> str:
@@ -52,7 +53,7 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
-    def completion(self, image_path: str, prior_page: Optional[str] = "") -> ModelCompletionResult:
+    async def completion(self, image_path: str, prior_page: Optional[str] = "") -> ModelCompletionResult:
         """
         Generate a markdown representation of a PDF page from an image.
 
@@ -61,23 +62,40 @@ class LlmModel:
             prior_page (str, optional): The markdown of a previously processed page for formatting consistency.
 
         Returns:
-            str: The generated markdown.
+            ModelCompletionResult: The generated markdown and token usage details.
         """
         messages = self._get_messages(image_path=image_path, prior_page=prior_page)
 
         try:
-            response = self.client.chat.completions.create(
+            logger.info(f"Processing LLM request for image: {image_path}")
+            response = await self.client.chat.completions.create(
                 model=self._model_name,
                 messages=messages,
             )
             content = response.choices[0].message.content.strip()
             usage = response.usage  # Extract token usage
 
+            if content.startswith("```") and content.endswith("```"):
+                # Remove leading and trailing triple backticks
+                content = content.removeprefix("```").removesuffix("```")
+                
+                # Remove optional language specifiers at the start
+                for lang_tag in ("markdown", "md"):
+                    if content.startswith(lang_tag):
+                        content = content[len(lang_tag):]
+                        break
+                
+                # Clean up leading/trailing whitespace
+                content = content.strip()
+
+            logger.info(f"Finished processing LLM request for image: {image_path}")
+
             # Extract required information and return a CompletionResult
             return ModelCompletionResult(
                 page_markdown=content,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
+                cost=self.calculate_costs(usage.prompt_tokens, usage.completion_tokens)
             )
         except Exception as err:
             logger.exception("Error while processing LLM request.")
@@ -123,3 +141,28 @@ class LlmModel:
             messages.insert(1, {"role": "system", "content": formatting_message})
 
         return messages
+    
+    def calculate_costs(self, prompt_tokens: int, completion_tokens: int) -> float:
+        """
+        Calculate the cost of the completion based on the token usage.
+
+        Args:
+            prompt_tokens (int): The number of tokens used in the prompt.
+            completion_tokens (int): The number of tokens used in the completion.
+
+        Returns:
+            float: The cost of the completion.
+        """
+
+        
+        input_token_costs_per_1k = 0.0
+        completion_token_costs_per_1k = 0.0
+
+        if self._model_name == "gpt-4o":
+            input_token_costs_per_1k = 0.00250
+            completion_token_costs_per_1k = 0.01000
+
+        input_token_costs = (prompt_tokens / 1000) * input_token_costs_per_1k
+        completion_token_costs = (completion_tokens / 1000) * completion_token_costs_per_1k
+
+        return input_token_costs + completion_token_costs

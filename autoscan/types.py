@@ -14,3 +14,4 @@ class ModelCompletionResult:
     page_markdown: str
     prompt_tokens: int
     completion_tokens: int
+    cost: float
