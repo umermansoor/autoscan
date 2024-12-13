@@ -10,6 +10,10 @@ AutoScan is a tool that converts PDF files to Markdown using AI. It extracts tex
 - **Multi-language Support**: Handles multiple languages.
 - **Metadata Extraction**: Extracts titles, authors, and other metadata.
 
+![Example 1 ](https://private-user-images.githubusercontent.com/862952/395720191-296f93c4-8f04-4771-887c-08c45fdd1d95.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MzQxMzIwNjQsIm5iZiI6MTczNDEzMTc2NCwicGF0aCI6Ii84NjI5NTIvMzk1NzIwMTkxLTI5NmY5M2M0LThmMDQtNDc3MS04ODdjLTA4YzQ1ZmRkMWQ5NS5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjQxMjEzJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI0MTIxM1QyMzE2MDRaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1hZmU2ZmMzOTc5Zjc0Nzc4OWUxMGIyYzQ4ZDcyYzc4ZDY0M2ViMmRiOWZkNmQzYThkODE1NmIzZThkNmJlMzVkJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.aUU2nPt8IG3II-Do_hPJe-LMGMVexTeEb0o5Jdf7XZ8)
+
+![Example 2](https://private-user-images.githubusercontent.com/862952/395720236-44d3ea28-2ca8-4d86-ab79-29683e5529c1.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MzQxMzIwNjQsIm5iZiI6MTczNDEzMTc2NCwicGF0aCI6Ii84NjI5NTIvMzk1NzIwMjM2LTQ0ZDNlYTI4LTJjYTgtNGQ4Ni1hYjc5LTI5NjgzZTU1MjljMS5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjQxMjEzJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI0MTIxM1QyMzE2MDRaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0yNGE5M2FkYmFhMjhhMzhiMGZjMmEzNWY3NzkxMDUwZDQ4ZTc5ODg5NmE1MjFkODE3OTlkM2FjZWU2YTFkMmY5JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.e_Uh9NVHSGPcvtLp-ei7xwjpZJVlSpl1jJCH18vgCDc)
+
 ## Installation
 
 To install the required dependencies, run:
@@ -30,6 +34,14 @@ brew install poppler
 
 ```sh
 sudo apt-get install poppler-utils
+```
+
+## Set `OPENAI_API_KEY`
+
+### On Mac/Linux
+
+```sh
+export OPENAI_API_KEY=your_api_key
 ```
 
 ## Usage
