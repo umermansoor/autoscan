@@ -1,6 +1,5 @@
 import logging
 import os
-import aiohttp
 from typing import List, Dict, Any, Optional
 from openai import AsyncOpenAI
 from autoscan.image_processing import image_to_base64
@@ -18,9 +17,26 @@ class LlmModel:
     DEFAULT_SYSTEM_PROMPT = (
         "Your job is to convert the following PDF page to markdown. "
         "You must convert the entire page to markdown including all text, tables, etc. "
-        "If you encounter any images, you must describe them in the markdown. "
         "Only return the markdown with no explanation."
     )
+
+    DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION = """
+    Your job is to convert the following PDF page to markdown.  
+    You must convert the entire page to markdown including all text, tables, etc.  
+    Only return the markdown with no explanation.  
+
+    The markdown will be processed by AI model that cannot see or process images, so you must define images in words when you see them in the page.
+    Do not provide link to images, that is, you must not use the the following format: ![image](image_url).
+
+    If you see an image within the page such as a chart, graph, diagram, or an illustration, you must describe the image in a few sentences to capture all the details. The description should convey the purpose, layout, and any key data or labels in the image. For example:
+
+    > **Image Description**: The image shows a bar chart illustrating quarterly revenue trends for 2023. The X-axis represents Q1 through Q4, while the Y-axis displays revenue in millions. The chart highlights revenue growth from $2M in Q1 to $10M in Q3, followed by a slight decline to $8M in Q4. 
+
+    Ensure your markdown output adheres to proper formatting for headers, lists, tables, and other structural elements as presented in the PDF.  
+
+    If the PDF includes complex visuals, replace them with detailed descriptions formatted clearly in markdown, using blockquotes or structured sections to maintain readability. Do not embed or include actual image files.
+    """
+
 
     def __init__(self, model_name: str = "gpt-4o"):
         """
@@ -31,6 +47,7 @@ class LlmModel:
         """
         self._model_name = model_name
         self._system_prompt = self.DEFAULT_SYSTEM_PROMPT
+        self._system_prompt_image_transcription = self.DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @property
@@ -53,7 +70,7 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
-    async def completion(self, image_path: str, prior_page: Optional[str] = "") -> ModelCompletionResult:
+    async def completion(self, image_path: str, prior_page: Optional[str] = "", transcribe_images = False) -> ModelCompletionResult:
         """
         Generate a markdown representation of a PDF page from an image.
 
@@ -64,7 +81,7 @@ class LlmModel:
         Returns:
             ModelCompletionResult: The generated markdown and token usage details.
         """
-        messages = self._get_messages(image_path=image_path, prior_page=prior_page)
+        messages = self._get_messages(image_path=image_path, prior_page=prior_page, transcibe_images=transcribe_images)
 
         try:
             logger.info(f"Processing LLM request for image: {image_path}")
@@ -101,7 +118,7 @@ class LlmModel:
             logger.exception("Error while processing LLM request.")
             raise RuntimeError("Error: Unable to process request. Please try again later.") from err
 
-    def _get_messages(self, image_path: str, prior_page: Optional[str]) -> List[Dict[str, Any]]:
+    def _get_messages(self, image_path: str, prior_page: Optional[str], transcibe_images = False) -> List[Dict[str, Any]]:
         """
         Construct the message payload for the LLM.
 
@@ -126,8 +143,10 @@ class LlmModel:
             }
         ]
 
+        system_prompt = self._system_prompt_image_transcription if transcibe_images else self._system_prompt
+
         messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": self.system_prompt},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content}
         ]
 

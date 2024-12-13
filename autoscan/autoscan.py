@@ -15,6 +15,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 async def autoscan(
     pdf_path: str, 
     model_name: str = "gpt-4o",
+    transcribe_images: Optional[bool] = True,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True
@@ -62,7 +63,7 @@ async def autoscan(
     model = LlmModel(model_name=model_name)
     logging.info(f"Initialized model: {model_name}")
 
-    aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost = await _process_images_async(images, model)
+    aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost = await _process_images_async(images, model, transcribe_images)
 
     output_file = await asyncio.to_thread(_write_markdown, pdf_path, output_dir, aggregated_markdown)
 
@@ -83,7 +84,7 @@ async def autoscan(
         output_tokens=total_completion_tokens,
     )
 
-async def _process_images_async(images: List[str], model: LlmModel):
+async def _process_images_async(images: List[str], model: LlmModel, transcribe_images):
     aggregated_markdown = []
     prior_page_markdown = ""
     total_prompt_tokens = 0
@@ -93,7 +94,7 @@ async def _process_images_async(images: List[str], model: LlmModel):
     async def process_single_image(image_path):
         try:
             # Await the async `completion` method
-            result = await model.completion(image_path, prior_page_markdown)
+            result = await model.completion(image_path, prior_page_markdown, transcribe_images=transcribe_images)
             if not result.page_markdown.strip():
                 raise ValueError(f"Generated markdown for image '{image_path}' is empty.")
             return result
