@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from openai import AsyncOpenAI
 from autoscan.image_processing import image_to_base64
 from .types import ModelCompletionResult
+from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -14,30 +15,6 @@ class LlmModel:
     using an LLM. It can maintain formatting consistency with previously processed pages.
     """
 
-    DEFAULT_SYSTEM_PROMPT = (
-        "Your job is to convert the following PDF page to markdown. "
-        "You must convert the entire page to markdown including all text, tables, etc. "
-        "Only return the markdown with no explanation."
-    )
-
-    DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION = """
-    Your job is to convert the following PDF page to markdown.  
-    You must convert the entire page to markdown including all text, tables, etc.  
-    Only return the markdown with no explanation.  
-
-    The markdown will be processed by AI model that cannot see or process images, so you must define images in words when you see them in the page.
-    Do not provide link to images, that is, you must not use the the following format: ![image](image_url).
-
-    If you see an image within the page such as a chart, graph, diagram, or an illustration, you must describe the image in a few sentences to capture all the details. The description should convey the purpose, layout, and any key data or labels in the image. For example:
-
-    > **Image Description**: The image shows a bar chart illustrating quarterly revenue trends for 2023. The X-axis represents Q1 through Q4, while the Y-axis displays revenue in millions. The chart highlights revenue growth from $2M in Q1 to $10M in Q3, followed by a slight decline to $8M in Q4. 
-
-    Ensure your markdown output adheres to proper formatting for headers, lists, tables, and other structural elements as presented in the PDF.  
-
-    If the PDF includes complex visuals, replace them with detailed descriptions formatted clearly in markdown, using blockquotes or structured sections to maintain readability. Do not embed or include actual image files.
-    """
-
-
     def __init__(self, model_name: str = "gpt-4o"):
         """
         Initialize the LLM model interface.
@@ -46,8 +23,8 @@ class LlmModel:
             model_name (str): The model name to use. Defaults to "gpt-4o".
         """
         self._model_name = model_name
-        self._system_prompt = self.DEFAULT_SYSTEM_PROMPT
-        self._system_prompt_image_transcription = self.DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
+        self._system_prompt = DEFAULT_SYSTEM_PROMPT
+        self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @property
@@ -154,7 +131,7 @@ class LlmModel:
         if prior_page:
             # Insert a system-level message guiding the model to maintain formatting consistency.
             formatting_message = (
-                "Below is previously processed markdown. Maintain similar formatting:\n\n"
+                "Below is previously processed markdown. Maintain similar formatting with it for consistency:\n\n"
                 f'"""{prior_page}"""'
             )
             messages.insert(1, {"role": "system", "content": formatting_message})
@@ -172,7 +149,6 @@ class LlmModel:
         Returns:
             float: The cost of the completion.
         """
-
         
         input_token_costs_per_1k = 0.0
         completion_token_costs_per_1k = 0.0

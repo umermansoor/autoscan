@@ -1,32 +1,32 @@
 Autoscan is a tool for converting PDFs faithfully to markdown that LLMs can process easily.
 
-Here's an image:
+Here’s an image:
 
-**Image Description**: The image depicts a beautifully decorated outdoor wedding altar by the sea. The altar is flanked by large classical columns wrapped in sheer blue fabric. The top is adorned with white flowers. The setting overlooks the ocean, and the ground is covered with a blue carpet. There are trees and stone architecture surrounding the scene.
+> **Image Description**: This image shows an elegant outdoor setting for a wedding ceremony. It features a beautifully decorated archway with blue drapes and white flowers, set against a stunning backdrop of the sea. The area is framed by lush greenery and classic stone architecture, contributing to a tranquil and romantic atmosphere.
 
-Let's use headings.
+Let’s use headings.
 
-# Auto Scan
+## Auto Scan
 
-Autoscan is a tool for automatically creating **Markdown** from **PDF** files. Yes, you heard it *right*.
+Autoscan is a tool for automatically creating **Markdown** from **PDF** files. Yes, you heard it _right_.
 
-## Markdown (Subheading)
+### Markdown (Subheading)
 
-In case you are wondering, Markdown is an easy to use *markup* language for creating formatted text using a plain-text editor.
+In case you are wondering, Markdown is an easy to use _markup_ language for creating formatted text using a plain-text editor.
 
 How cool is that!
 
-Here's another image.
+Here’s another image.
 
-**Image Description**: The image displays a fluffy white kitten sitting by a window. The kitten is looking to the side with bright eyes, and there is a small orange pumpkin placed on the window sill beside it. The background is softly blurred, giving a serene and calm atmosphere.
+> **Image Description**: A photograph of a small, fluffy white kitten sitting on a windowsill. The kitten has blue eyes and is looking slightly to the side. There is a small, round orange pumpkin next to it. The background shows a soft, blurred view through the window, likely of a bright sky or daylight.
 
 The nice thing is that Markdown can also support tables.
 
-| City    | Population        | Size          |
-|---------|-------------------|---------------|
-| New York| Too many people!  | Not big enough|
-| Toronto | Too many people!  | Big enough    |
-| IDK     |                   |               |
+| City     | Population     | Size           |
+|----------|----------------|----------------|
+| New York | Too many people! | Not big enough |
+| Toronto  | Too many people! | Big enough     |
+| IDK      |                |                |
 
 Markdown can also display math equations and formulas using plugins like Katex.
 
