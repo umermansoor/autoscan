@@ -1,6 +1,6 @@
 # Hello AutoScan, Most Accurate PDF to Markdown
 
-AutoScan converts PDFs into clean **Markdown** so you can focus on using your documents, not wrestling with them. It extracts text, handles images, and even decodes handwriting - without you pulling your hair out.
+AutoScan converts **PDFs** into clean **Markdown** so you can focus on using your documents, not wrestling with them. It extracts text, handles images, and even decodes handwriting - without you pulling your hair out.
 
 Let's see what it can do.
 
