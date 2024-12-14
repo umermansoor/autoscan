@@ -34,36 +34,31 @@ async def autoscan(
     - `transcribe_images` (bool, optional): Whether to process images for transcription. Defaults to `True`.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the same location as the input PDF if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images during processing. If not specified, a temporary directory will be created and cleaned automatically.
-    - `cleanup_temp` (bool, optional): If `True`, cleans up temporary files when the process completes. Defaults to `True`.
+    - `cleanup_temp` (bool, optional): If `True` and a temporary directory was passed, cleans up temporary files when the process completes. Defaults to `True`.
 
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
     """
 
-    if temp_dir:
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_directory = temp_dir
-        temp_dir_context = None
-    else:
-        temp_dir_context = tempfile.TemporaryDirectory()
-        temp_directory = temp_dir_context.name
-    logging.info(f"Using temporary directory: {temp_directory}")
+    temp_directory = _create_temp_dir(temp_dir)
     
-    local_path = await get_or_download_file(pdf_path, temp_directory)
+    local_path = await  get_or_download_file(pdf_path, temp_directory)
     if not local_path:
         raise PDFFileNotFoundError(f"Failed to access or download PDF from: {pdf_path}")
 
     if not output_dir:
         output_dir = os.path.join(os.getcwd(), "output")
     os.makedirs(output_dir, exist_ok=True)
-    logging.info(f"Output directory: {output_dir}")
+    
+    logging.info(f"Using temporary directory: {temp_directory} and output directory: {output_dir}")
 
     start_time = datetime.now()
+
     images = await asyncio.to_thread(pdf_to_images, local_path, temp_directory)
     if not images:
         raise PDFPageToImageConversion("Failed to convert PDF pages to images.")
     
-    logging.info(f"Generated {len(images)} images from PDF.")
+    logging.info(f"Generated {len(images)} images.")
 
     model = LlmModel(model_name=model_name)
     logging.info(f"Initialized model: {model_name}")
@@ -75,12 +70,8 @@ async def autoscan(
 
     output_file = await asyncio.to_thread(_write_markdown, local_path, output_dir, aggregated_markdown)
 
-    if temp_dir_context:
-        temp_dir_context.cleanup()
-    elif cleanup_temp:
+    if temp_dir and cleanup_temp:
         await asyncio.to_thread(_cleanup_temp_files, images)
-
-    
 
     logging.info(f"Autoscan completed in {completion_time:.2f} seconds. Tokens Usage - Input: {total_prompt_tokens}, Output: {total_completion_tokens}. Cost = ${total_cost:.2f}." )
     return AutoScanOutput(
@@ -106,8 +97,7 @@ async def _process_images_async(images: List[str], model: LlmModel, transcribe_i
                 raise ValueError(f"Generated markdown for image '{image_path}' is empty.")
             return result
         except Exception as e:
-            logging.error(f"Error processing image '{image_path}': {e}")
-            return None
+            raise RuntimeError(f"Error processing image '{image_path}': {e}. Aborting.") 
 
     tasks = [process_single_image(image) for image in images]
     results = await asyncio.gather(*tasks)
@@ -125,6 +115,11 @@ async def _process_images_async(images: List[str], model: LlmModel, transcribe_i
 
     return aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost
 
+def _create_temp_dir(temp_dir: Optional[str]) -> str:
+    if not temp_dir: # if user didn't specify a temp directory, create one
+        temp_dir = tempfile.TemporaryDirectory().name
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
 
 def _write_markdown(pdf_path: str, output_dir: str, aggregated_markdown: List[str]) -> str:
     base_name = os.path.basename(pdf_path)
