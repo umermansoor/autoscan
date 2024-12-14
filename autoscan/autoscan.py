@@ -8,6 +8,7 @@ import tempfile
 from .image_processing import pdf_to_images
 from .model import LlmModel
 from .types import AutoScanOutput
+from  .common import get_or_download_file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -26,25 +27,23 @@ async def autoscan(
       2. Using an LLM to process each page image into markdown.
       3. Aggregating all markdown pages into a single file.
 
-    Args:
-        pdf_path (str): The path to the PDF file.
-        model_name (str, optional): The name of the model to use. Defaults to "gpt-4o".
-        output_dir (str, optional): Directory to save the output markdown.
-                                    If None, saves alongside the PDF.
-        temp_dir (str, optional): Directory for temporary images. If None, a temporary directory
-                                  is created and automatically cleaned up.
-        cleanup_temp (bool, optional): Whether to clean up temporary images if `temp_dir` is provided. Defaults to True.
+    ## Args
+    - `pdf_path` (str): **Required.** Path to the input PDF file.
+    - `model_name` (str, optional): Name of the AI model to process image-to-text conversion. Defaults to `"gpt-4o"`.
+    - `transcribe_images` (bool, optional): Whether to process images for transcription. Defaults to `True`.
+    - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the same location as the input PDF if not provided.
+    - `temp_dir` (str, optional): Directory for storing temporary images during processing. If not specified, a temporary directory will be created and cleaned automatically.
+    - `cleanup_temp` (bool, optional): If `True`, cleans up temporary files when the process completes. Defaults to `True`.
 
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
     """
-    if not pdf_path or not os.path.exists(pdf_path):
-        raise FileNotFoundError(f"PDF file not found: {pdf_path}")
-    logging.info(f"Starting autoscan for PDF: {pdf_path}")
-
     start_time = datetime.now()
 
-    output_dir = await asyncio.to_thread(_determine_output_dir, pdf_path, output_dir)
+    if not output_dir:
+        output_dir = os.path.join(os.getcwd(), "output")
+    os.makedirs(output_dir, exist_ok=True)
+    logging.info(f"Output directory: {output_dir}")
 
     if temp_dir:
         os.makedirs(temp_dir, exist_ok=True)
@@ -54,8 +53,12 @@ async def autoscan(
         temp_dir_context = tempfile.TemporaryDirectory()
         temp_directory = temp_dir_context.name
     logging.info(f"Using temporary directory: {temp_directory}")
+    
+    local_path = await get_or_download_file(pdf_path, temp_directory)
+    if local_path is None:
+        raise RuntimeError("Failed to download or locate the PDF file.")
 
-    images = await asyncio.to_thread(pdf_to_images, pdf_path, temp_directory)
+    images = await asyncio.to_thread(pdf_to_images, local_path, temp_directory)
     if not images:
         raise RuntimeError("No images were generated from the PDF.")
     logging.info(f"Generated {len(images)} images from PDF.")
@@ -65,7 +68,7 @@ async def autoscan(
 
     aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost = await _process_images_async(images, model, transcribe_images)
 
-    output_file = await asyncio.to_thread(_write_markdown, pdf_path, output_dir, aggregated_markdown)
+    output_file = await asyncio.to_thread(_write_markdown, local_path, output_dir, aggregated_markdown)
 
     if temp_dir_context:
         temp_dir_context.cleanup()
@@ -93,7 +96,7 @@ async def _process_images_async(images: List[str], model: LlmModel, transcribe_i
 
     async def process_single_image(image_path):
         try:
-            # Await the async `completion` method
+            # Await the async completion method
             result = await model.completion(image_path, prior_page_markdown, transcribe_images=transcribe_images)
             if not result.page_markdown.strip():
                 raise ValueError(f"Generated markdown for image '{image_path}' is empty.")
@@ -118,13 +121,6 @@ async def _process_images_async(images: List[str], model: LlmModel, transcribe_i
 
     return aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost
 
-
-def _determine_output_dir(pdf_path: str, output_dir: Optional[str]) -> str:
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-    else:
-        output_dir = os.path.dirname(os.path.abspath(pdf_path)) or os.getcwd()
-    return output_dir
 
 def _write_markdown(pdf_path: str, output_dir: str, aggregated_markdown: List[str]) -> str:
     base_name = os.path.basename(pdf_path)

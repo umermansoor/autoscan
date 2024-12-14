@@ -4,7 +4,7 @@ DEFAULT_SYSTEM_PROMPT = (
     "Only return the markdown with no explanation."
 )
 
-DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION = r"""
+DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION = """
 Your task is to accurately convert the content of a PDF page into properly structured Markdown format. 
 The conversion must include all elements of the page, such as text, tables, and images. 
 Do not provide any explanation or commentary in your output; return only the Markdown.
@@ -14,7 +14,11 @@ Do not provide any explanation or commentary in your output; return only the Mar
     - Convert the entire page's content, including headers, paragraphs, lists, and tables, into Markdown format.
     - Use proper Markdown syntax to ensure readability and accurate formatting.
 
-2. Handling Images and Visuals:
+2. Mathematical Equations and Formulas:
+    - LaTeX formatting should be enclosed in `$$...$$` so it can be rendered correctly using KaTeX e.g. $$E=mc^2$$
+    - Do these are all equations in the text, or image descriptions.
+
+3. Handling Images and Visuals:
     - If the page includes images, such as charts, graphs, diagrams, or illustrations:
         - Do NOT embed images using Markdown syntax (e.g., ![image](image_url)).
         - Instead, provide a descriptive summary of the image in Markdown, formatted as a blockquote (>).
@@ -22,39 +26,6 @@ Do not provide any explanation or commentary in your output; return only the Mar
     - Example of an image description:
         > **Image Description**: This image depicts a line graph showing annual sales growth from 2018 to 2023. The X-axis represents the years, and the Y-axis represents sales in millions of dollars. The graph shows steady growth, starting at $5M in 2018 and reaching $25M by 2023, with notable peaks in 2020 and 2022.
     - For complex visuals, provide structured descriptions using lists or sections within blockquotes for clarity.
-
-3. Mathematical Equations and Formulas:
-    - LaTeX formatting should be enclosed in `$$...$$` so it can be rendered correctly using KaTeX. 
-        - Inline examples:
-            - $$E=mc^2$$
-            - $$\sin(\alpha)^{\theta}=\sum_{i=0}^{n}(x^i + \cos(f))$$
-            - $$\displaystyle \left( \sum\_{k=1}^n a\_k b\_k \right)^2 \leq \left( \sum\_{k=1}^n a\_k^2 \right) \left( \sum\_{k=1}^n b\_k^2 \right)$$
-            - $$\textstyle \sum_{k=1}^N k^2$$
-        - Multiline example:  
-            - > \`\`\`math or \`\`\`latex or \`\`\`katex
-```math
-f(x) = \int_{-\infty}^\infty
-    \hat f(\xi)\,e^{2 \pi i \xi x}
-    \,d\xi
-```
-
-```katex
-\displaystyle 
-    \frac{1}{
-        \Bigl(\sqrt{\phi \sqrt{5}}-\phi\Bigr) e^{
-        \frac25 \pi}} = 1+\frac{e^{-2\pi}} {1+\frac{e^{-4\pi}} {
-        1+\frac{e^{-6\pi}}
-        {1+\frac{e^{-8\pi}}
-         {1+\cdots} }
-        } 
-    }
-```
-
-```latex
-f(x) = \int_{-\infty}^\infty
-    \hat f(\xi)\,e^{2 \pi i \xi x}
-    \,d\xi
-```
 
 4. Do not exclude any content from the page during conversion such as footers, side notes, or captions. Capture everything.
 
