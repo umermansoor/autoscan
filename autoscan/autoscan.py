@@ -9,6 +9,7 @@ from .image_processing import pdf_to_images
 from .model import LlmModel
 from .types import AutoScanOutput
 from  .common import get_or_download_file
+from .errors import PDFFileNotFoundError, PDFPageToImageConversion
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -38,12 +39,6 @@ async def autoscan(
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
     """
-    start_time = datetime.now()
-
-    if not output_dir:
-        output_dir = os.path.join(os.getcwd(), "output")
-    os.makedirs(output_dir, exist_ok=True)
-    logging.info(f"Output directory: {output_dir}")
 
     if temp_dir:
         os.makedirs(temp_dir, exist_ok=True)
@@ -55,18 +50,28 @@ async def autoscan(
     logging.info(f"Using temporary directory: {temp_directory}")
     
     local_path = await get_or_download_file(pdf_path, temp_directory)
-    if local_path is None:
-        raise RuntimeError("Failed to download or locate the PDF file.")
+    if not local_path:
+        raise PDFFileNotFoundError(f"Failed to access or download PDF from: {pdf_path}")
 
+    if not output_dir:
+        output_dir = os.path.join(os.getcwd(), "output")
+    os.makedirs(output_dir, exist_ok=True)
+    logging.info(f"Output directory: {output_dir}")
+
+    start_time = datetime.now()
     images = await asyncio.to_thread(pdf_to_images, local_path, temp_directory)
     if not images:
-        raise RuntimeError("No images were generated from the PDF.")
+        raise PDFPageToImageConversion("Failed to convert PDF pages to images.")
+    
     logging.info(f"Generated {len(images)} images from PDF.")
 
     model = LlmModel(model_name=model_name)
     logging.info(f"Initialized model: {model_name}")
 
     aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost = await _process_images_async(images, model, transcribe_images)
+
+    end_time = datetime.now()
+    completion_time = (end_time - start_time).total_seconds()
 
     output_file = await asyncio.to_thread(_write_markdown, local_path, output_dir, aggregated_markdown)
 
@@ -75,8 +80,7 @@ async def autoscan(
     elif cleanup_temp:
         await asyncio.to_thread(_cleanup_temp_files, images)
 
-    end_time = datetime.now()
-    completion_time = (end_time - start_time).total_seconds()
+    
 
     logging.info(f"Autoscan completed in {completion_time:.2f} seconds. Tokens Usage - Input: {total_prompt_tokens}, Output: {total_completion_tokens}. Cost = ${total_cost:.2f}." )
     return AutoScanOutput(

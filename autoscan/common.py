@@ -4,45 +4,44 @@ from typing import Optional
 from pathlib import Path
 from urllib.parse import urlparse
 
-async def get_or_download_file(
-    file_path: str,
-    destination_dir: str,
-) -> Optional[str]:
+async def get_or_download_file(file_path: str, destination_dir: str) -> Optional[str]:
     """
-    Asynchronously handle a given file path:
-      - If it is a URL, download it to the given destination directory.
-      - If it is a local file path, ensure it exists and return the absolute path.
+    Handles a file path or URL by ensuring the file exists locally.
+    - Downloads the file if it's a URL.
+    - Validates the existence of a local file path.
 
     Args:
-        file_path (str): The path to the file, which could be a URL or a local file.
-        destination_dir (str): The directory in which to store the downloaded file if `file_path` is a URL.
+        file_path (str): URL or local file path.
+        destination_dir (str): Directory for storing downloaded files.
 
     Returns:
-        Optional[str]: The full path to the file on the local filesystem, or None if the operation fails.
+        Optional[str]: Local file path, or None if the operation fails.
     """
-    parsed = urlparse(file_path)
+    try:
+        parsed = urlparse(file_path)
 
-    # Check if the path is a URL (has a network scheme)
-    if parsed.scheme in ("http", "https"):
-        # URL download logic
-        filename = Path(parsed.path).name
-        if not filename:
-            return None
+        # Handle URLs
+        if parsed.scheme in ("http", "https"):
+            filename = Path(parsed.path).name or "downloaded_file"
+            local_path = Path(destination_dir) / filename
 
-        target_directory = Path(destination_dir)
-        target_directory.mkdir(parents=True, exist_ok=True)
-        local_path = target_directory / filename
+            # Create destination directory if needed
+            local_path.parent.mkdir(parents=True, exist_ok=True)
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(file_path) as response:
-                if response.status != 200:
-                    return None
-                async with aiofiles.open(local_path, mode='wb') as f:
-                    async for chunk in response.content.iter_chunked(1024):
-                        await f.write(chunk)
-        return str(local_path)
-    else:
-        # Assume it's a local file path
+            # Download the file
+            async with aiohttp.ClientSession() as session:
+                async with session.get(file_path) as response:
+                    if response.status != 200:
+                        return None
+                    async with aiofiles.open(local_path, mode="wb") as f:
+                        await f.write(await response.read())
+            return str(local_path)
+
+        # Handle local file paths
         local_path = Path(file_path).resolve()
-        return str(local_path) if local_path.exists() else None
+        if not local_path.exists():
+            return None
+        return str(local_path)
 
+    except Exception:
+        return None

@@ -36,6 +36,14 @@ brew install poppler
 sudo apt-get install poppler-utils
 ```
 
+### To Test
+
+To run tests:
+
+```sh
+poetry run pytest tests/
+```
+
 ## Set `OPENAI_API_KEY`
 
 ### On Mac/Linux
