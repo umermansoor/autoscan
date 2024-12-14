@@ -25,6 +25,8 @@ class LlmModel:
         self._model_name = model_name
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
+        if not "OPENAI_API_KEY" in os.environ:
+            raise ValueError("OPENAI_API_KEY environment variable is not set.")
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @property
