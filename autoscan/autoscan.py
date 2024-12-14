@@ -8,8 +8,8 @@ import tempfile
 from .image_processing import pdf_to_images
 from .model import LlmModel
 from .types import AutoScanOutput
-from  .common import get_or_download_file
-from .errors import PDFFileNotFoundError, PDFPageToImageConversion
+from  .common import get_or_download_file, write_text_to_file
+from .errors import PDFFileNotFoundError, PDFPageToImageConversion, MarkdownFileWriteError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -34,13 +34,13 @@ async def autoscan(
     - `transcribe_images` (bool, optional): Whether to process images for transcription. Defaults to `True`.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the same location as the input PDF if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images during processing. If not specified, a temporary directory will be created and cleaned automatically.
-    - `cleanup_temp` (bool, optional): If `True` and a temporary directory was passed, cleans up temporary files when the process completes. Defaults to `True`.
+    - `cleanup_temp` (bool, optional): If `True`, cleans up  temporary, intermediate files when the process completes. Defaults to `True`.
 
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
     """
 
-    temp_directory = _create_temp_dir(temp_dir)
+    temp_directory = _create_temp_dir(temp_dir, cleanup_temp)
     
     local_path = await  get_or_download_file(pdf_path, temp_directory)
     if not local_path:
@@ -68,15 +68,18 @@ async def autoscan(
     end_time = datetime.now()
     completion_time = (end_time - start_time).total_seconds()
 
-    output_file = await asyncio.to_thread(_write_markdown, local_path, output_dir, aggregated_markdown)
-
-    if temp_dir and cleanup_temp:
-        await asyncio.to_thread(_cleanup_temp_files, images)
+    output_filename = await write_text_to_file(os.path.splitext(os.path.basename(pdf_path))[0] + ".md", output_dir, "\n\n".join(aggregated_markdown))
+    if not output_filename:
+        raise MarkdownFileWriteError(f"Failed to write markdown file: {output_filename}")
 
     logging.info(f"Autoscan completed in {completion_time:.2f} seconds. Tokens Usage - Input: {total_prompt_tokens}, Output: {total_completion_tokens}. Cost = ${total_cost:.2f}." )
+
+    if cleanup_temp: 
+        await asyncio.to_thread(_cleanup_temp_files, images)
+
     return AutoScanOutput(
         completion_time=completion_time,
-        markdown_file=output_file,
+        markdown_file=output_filename,
         markdown="\n\n".join(aggregated_markdown),
         input_tokens=total_prompt_tokens,
         output_tokens=total_completion_tokens,
@@ -91,10 +94,7 @@ async def _process_images_async(images: List[str], model: LlmModel, transcribe_i
 
     async def process_single_image(image_path):
         try:
-            # Await the async completion method
             result = await model.completion(image_path, prior_page_markdown, transcribe_images=transcribe_images)
-            if not result.page_markdown.strip():
-                raise ValueError(f"Generated markdown for image '{image_path}' is empty.")
             return result
         except Exception as e:
             raise RuntimeError(f"Error processing image '{image_path}': {e}. Aborting.") 
@@ -110,31 +110,13 @@ async def _process_images_async(images: List[str], model: LlmModel, transcribe_i
             total_completion_tokens += result.completion_tokens
             total_cost += result.cost
 
-    if not aggregated_markdown:
-        raise RuntimeError("No valid markdown was generated from the images.")
-
     return aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost
 
-def _create_temp_dir(temp_dir: Optional[str]) -> str:
+def _create_temp_dir(temp_dir: Optional[str], cleanup: bool = True ) -> str:
     if not temp_dir: # if user didn't specify a temp directory, create one
-        temp_dir = tempfile.TemporaryDirectory().name
+        temp_dir = tempfile.TemporaryDirectory(delete=cleanup).name
     os.makedirs(temp_dir, exist_ok=True)
     return temp_dir
-
-def _write_markdown(pdf_path: str, output_dir: str, aggregated_markdown: List[str]) -> str:
-    base_name = os.path.basename(pdf_path)
-    base_name_without_ext = os.path.splitext(base_name)[0]
-    output_file = os.path.join(output_dir, f"{base_name_without_ext}.md")
-
-    final_markdown = "\n\n".join(aggregated_markdown)
-    try:
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(final_markdown)
-        logging.info(f"Markdown written to: {output_file}")
-    except Exception as e:
-        raise IOError(f"Failed to write markdown file: {e}")
-
-    return output_file
 
 def _cleanup_temp_files(images: List[str]):
     for img in images:

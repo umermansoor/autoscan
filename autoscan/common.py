@@ -45,3 +45,27 @@ async def get_or_download_file(file_path: str, destination_dir: str) -> Optional
 
     except Exception:
         return None
+
+
+async def write_text_to_file(filename: str, output_dir: str, text:str) -> Optional[str]:
+    """
+    Writes text content to a file in the specified output directory.
+
+    Args:
+        filename (str): Name of the file to write.
+        output_dir (str): Directory for storing the file.
+
+    Returns:
+        str: Full path to the written file.
+    """
+
+    if not filename or not output_dir:
+        return None
+    
+    output_path = Path(output_dir) / filename
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    async with aiofiles.open(output_path, mode="w") as f:
+        await f.write(text)
+
+    return str(output_path)
