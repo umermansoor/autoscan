@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from autoscan.autoscan import autoscan
-from autoscan.errors import PDFFileNotFoundError, PDFPageToImageConversion
+from autoscan.errors import PDFFileNotFoundError, PDFPageToImageConversionError
 from autoscan.types import AutoScanOutput
 
 @pytest.mark.asyncio
@@ -65,7 +65,7 @@ async def test_autoscan_no_images_generated(tmp_path):
          patch("os.makedirs"):
 
         # Run the function and verify it raises a RuntimeError
-        with pytest.raises(PDFPageToImageConversion, match="Failed to convert PDF pages to images."):
+        with pytest.raises(PDFPageToImageConversionError, match="Failed to convert PDF pages to images."):
             await autoscan(pdf_path, temp_dir=str(temp_dir))
 
 @pytest.mark.asyncio

@@ -1,5 +1,5 @@
 import aiohttp
-import aiofiles
+import aiofiles # type: ignore
 from typing import Optional
 from pathlib import Path
 from urllib.parse import urlparse

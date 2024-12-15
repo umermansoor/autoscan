@@ -1,13 +1,9 @@
-import logging
 import os
 from typing import List, Dict, Any, Optional
 from openai import AsyncOpenAI
-from autoscan.image_processing import image_to_base64
+from .image_processing import image_to_base64
 from .types import ModelCompletionResult
 from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 class LlmModel:
     """
@@ -49,21 +45,20 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
-    async def completion(self, image_path: str, prior_page: Optional[str] = "", transcribe_images = False) -> ModelCompletionResult:
+    async def completion(self, image_path: str, transcribe_images = False) -> ModelCompletionResult:
         """
         Generate a markdown representation of a PDF page from an image.
 
         Args:
             image_path (str): Path to the image file of the PDF page.
-            prior_page (str, optional): The markdown of a previously processed page for formatting consistency.
+            transcribe_images: Describes images in words within the markdown.
 
         Returns:
             ModelCompletionResult: The generated markdown and token usage details.
         """
-        messages = self._get_messages(image_path=image_path, prior_page=prior_page, transcibe_images=transcribe_images)
+        messages = self._get_messages(image_path=image_path, transcibe_images=transcribe_images)
 
         try:
-            logger.info(f"Processing LLM request for image: {image_path}")
             response = await self.client.chat.completions.create(
                 model=self._model_name,
                 messages=messages,
@@ -84,8 +79,6 @@ class LlmModel:
                 # Clean up leading/trailing whitespace
                 content = content.strip()
 
-            logger.info(f"Finished processing LLM request for image: {image_path}")
-
             # Extract required information and return a CompletionResult
             return ModelCompletionResult(
                 page_markdown=content,
@@ -94,10 +87,9 @@ class LlmModel:
                 cost=self.calculate_costs(usage.prompt_tokens, usage.completion_tokens)
             )
         except Exception as err:
-            logger.exception("Error while processing LLM request.")
             raise RuntimeError("Error: Unable to process request. Please try again later.") from err
 
-    def _get_messages(self, image_path: str, prior_page: Optional[str], transcibe_images = False) -> List[Dict[str, Any]]:
+    def _get_messages(self, image_path: str, transcibe_images = False) -> List[Dict[str, Any]]:
         """
         Construct the message payload for the LLM.
 
@@ -128,16 +120,7 @@ class LlmModel:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content}
         ]
-
-        # If a prior page is provided, you can use it to maintain formatting consistency.
-        if prior_page:
-            # Insert a system-level message guiding the model to maintain formatting consistency.
-            formatting_message = (
-                "Below is previously processed markdown. Maintain similar formatting with it for consistency:\n\n"
-                f'"""{prior_page}"""'
-            )
-            messages.insert(1, {"role": "system", "content": formatting_message})
-
+        
         return messages
     
     def calculate_costs(self, prompt_tokens: int, completion_tokens: int) -> float:
