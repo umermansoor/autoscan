@@ -6,9 +6,19 @@ import io
 
 from pdf2image import convert_from_path
 
+from .config import PDF2ImageConversionConfig
+
 def pdf_to_images(pdf_path: str, temp_folder: str) -> Optional[List[str]]:
     try:
-        image_paths = convert_from_path(pdf_path, output_folder=temp_folder, paths_only=True, fmt="png", dpi=300, use_pdftocairo=True, thread_count=5)
+        image_paths = convert_from_path(
+            pdf_path, 
+            output_folder=temp_folder, 
+            paths_only=True, 
+            size=PDF2ImageConversionConfig.SIZE,
+            fmt=PDF2ImageConversionConfig.FORMAT, 
+            dpi=PDF2ImageConversionConfig.DPI, 
+            use_pdftocairo=PDF2ImageConversionConfig.USE_PDFTOCAIRO, 
+            thread_count=PDF2ImageConversionConfig.NUM_THREADS)
         return image_paths
     except Exception as e:
         logging.error(f"Error converting PDF to images: {e}")

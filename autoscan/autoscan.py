@@ -21,7 +21,7 @@ async def autoscan(
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
-    concurrency: Optional[int] = 10  # Default concurrency set to 10
+    concurrency: Optional[int] = 10 
 ) -> AutoScanOutput:
     """
     Convert a PDF to markdown by:

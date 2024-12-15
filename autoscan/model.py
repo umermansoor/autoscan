@@ -95,7 +95,6 @@ class LlmModel:
 
         Args:
             image_path (str): The image path of the PDF page.
-            prior_page (str, optional): The previously processed page's markdown, if any.
 
         Returns:
             List[Dict[str, Any]]: A list of message objects for the LLM API.
