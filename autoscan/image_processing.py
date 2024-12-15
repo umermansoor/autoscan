@@ -8,7 +8,7 @@ from pdf2image import convert_from_path
 
 def pdf_to_images(pdf_path: str, temp_folder: str) -> Optional[List[str]]:
     try:
-        image_paths = convert_from_path(pdf_path, output_folder=temp_folder, paths_only=True, fmt="png")
+        image_paths = convert_from_path(pdf_path, output_folder=temp_folder, paths_only=True, fmt="png", dpi=300, use_pdftocairo=True, thread_count=5)
         return image_paths
     except Exception as e:
         logging.error(f"Error converting PDF to images: {e}")
