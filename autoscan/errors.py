@@ -9,3 +9,7 @@ class PDFPageToImageConversionError(Exception):
 class MarkdownFileWriteError(Exception):
     """Raised when the markdown file cannot be written."""
     pass
+
+class LLMProcessingError(Exception):
+    """Raised when the LLM processing fails."""
+    pass
