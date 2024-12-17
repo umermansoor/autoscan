@@ -10,7 +10,7 @@ class AutoScanOutput:
 
 
 @dataclass
-class ModelCompletionResult:
+class ImageToMarkdownResult:
     page_markdown: str
     prompt_tokens: int
     completion_tokens: int

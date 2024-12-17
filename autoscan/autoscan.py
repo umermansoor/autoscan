@@ -18,6 +18,7 @@ async def autoscan(
     pdf_path: str,
     model_name: str = "gpt-4o",
     transcribe_images: bool = True,
+    postprocess_markdown: bool = True,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
@@ -79,12 +80,13 @@ async def autoscan(
             images, model, transcribe_images, concurrency=concurrency
         )
 
+        markdown_content = await _postprocess_markdown(aggregated_markdown, model) if postprocess_markdown else "\n\n".join(aggregated_markdown)
+
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
 
         # Write the aggregated markdown to file
         base_name = os.path.splitext(os.path.basename(pdf_path))[0]
-        markdown_content = "\n\n".join(aggregated_markdown)
         output_filename = await write_text_to_file(f"{base_name}.md", output_dir, markdown_content)
         if not output_filename:
             raise MarkdownFileWriteError(f"Failed to write markdown file: {output_filename}")
@@ -108,79 +110,51 @@ async def autoscan(
         if cleanup_temp and images:
             await asyncio.to_thread(_cleanup_temp_files, images)
 
+async def _postprocess_markdown(markdown: List[str], model: LlmModel) -> str:
+    """
+    Post-process the markdown content using the given LLM model.
+
+    Args:
+        markdown: List of markdown strings to process.
+        model: LlmModel instance for review.
+
+    Returns:
+        The aggregated markdown content.
+    """
+    return await model.postprocess_markdown(markdown)
 
 async def _process_images_async(
-    images: List[str],
+    pdf_page_images: List[str],
     model: LlmModel,
     transcribe_images: bool,
     concurrency: Optional[int] = 10
 ) -> Tuple[List[str], int, int, float]:
     """
     Process each image using the given model to extract text.
-
-    Args:
-        images: List of image file paths.
-        model: LlmModel instance for text extraction.
-        transcribe_images: Whether or not to perform transcription.
-        concurrency: Maximum concurrency for model calls.
-
-    Returns:
-        A tuple containing:
-            - A list of aggregated markdown strings for each page.
-            - Total prompt tokens used.
-            - Total completion tokens used.
-            - Total cost incurred.
     """
 
-    # Use semaphore if concurrency is specified
-    semaphore = asyncio.Semaphore(concurrency) if concurrency is not None else None
+    if not concurrency:
+        concurrency = len(pdf_page_images)
+
+    context = asyncio.Semaphore(concurrency)
 
     async def process_single_image(image_path: str):
-        if semaphore:
-            async with semaphore:
-                return await _run_model_completion(model, image_path, transcribe_images)
-        else:
-            return await _run_model_completion(model, image_path, transcribe_images)
+        async with context:
+            try:
+                return await model.image_to_markdown(image_path, transcribe_images=transcribe_images)
+            except Exception as e:
+                raise LLMProcessingError(f"Error processing image '{image_path}': {e}. Aborting.")
 
-    tasks = [process_single_image(img) for img in images]
-    results = await asyncio.gather(*tasks)
+    results = await asyncio.gather(*(process_single_image(img) for img in pdf_page_images))
+    valid_results = [r for r in results if r]
 
-    aggregated_markdown = []
-    total_prompt_tokens = 0
-    total_completion_tokens = 0
-    total_cost = 0.0
-
-    # Aggregate results
-    for result in results:
-        if result:
-            aggregated_markdown.append(result.page_markdown)
-            total_prompt_tokens += result.prompt_tokens
-            total_completion_tokens += result.completion_tokens
-            total_cost += result.cost
+    aggregated_markdown = [r.page_markdown for r in valid_results]
+    total_prompt_tokens = sum(r.prompt_tokens for r in valid_results)
+    total_completion_tokens = sum(r.completion_tokens for r in valid_results)
+    total_cost = sum(r.cost for r in valid_results)
 
     return aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost
-
-
-async def _run_model_completion(model: LlmModel, image_path: str, transcribe_images: bool):
-    """
-    Run a single model completion task for the given image.
-    
-    Args:
-        model: LlmModel instance.
-        image_path: The path to the image to be processed.
-        transcribe_images: Whether transcription is required.
-
-    Returns:
-        The result from the model completion if successful.
-
-    Raises:
-        RuntimeError: If an error occurs during model processing.
-    """
-    try:
-        return await model.completion(image_path, transcribe_images=transcribe_images)
-    except Exception as e:
-        raise LLMProcessingError(f"Error processing image '{image_path}': {e}. Aborting.")
-
+          
 
 def _create_temp_dir(temp_dir: Optional[str] = None, cleanup: bool = True) -> Tuple[str, Optional[tempfile.TemporaryDirectory]]:
     """

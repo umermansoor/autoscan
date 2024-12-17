@@ -2,8 +2,8 @@ import os
 from typing import List, Dict, Any, Optional
 from openai import AsyncOpenAI
 from .image_processing import image_to_base64
-from .types import ModelCompletionResult
-from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
+from .types import ImageToMarkdownResult
+from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION, FINAL_REVIEW_PROMPT
 
 class LlmModel:
     """
@@ -45,7 +45,7 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
-    async def completion(self, image_path: str, transcribe_images = False) -> ModelCompletionResult:
+    async def image_to_markdown(self, image_path: str, transcribe_images = False) -> ImageToMarkdownResult:
         """
         Generate a markdown representation of a PDF page from an image.
 
@@ -80,7 +80,7 @@ class LlmModel:
                 content = content.strip()
 
             # Extract required information and return a CompletionResult
-            return ModelCompletionResult(
+            return ImageToMarkdownResult(
                 page_markdown=content,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
@@ -121,6 +121,39 @@ class LlmModel:
         ]
         
         return messages
+    
+    async def postprocess_markdown(self, markdowns: List[str]) -> str:
+        # Combine all markdown input into a single string
+        separator = "\n\n---PAGE BREAK---\n\n"
+        user_content = separator.join(markdowns)
+
+        messages = [
+            {"role": "system", "content": FINAL_REVIEW_PROMPT},
+            {"role": "user", "content": user_content}
+        ]
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self._model_name,
+                messages=messages,
+            )
+            content = response.choices[0].message.content.strip()
+
+            # Remove enclosing triple backticks if present
+            if content.startswith("```") and content.endswith("```"):
+                content = content.removeprefix("```").removesuffix("```").strip()
+
+                # Remove optional language specifiers
+                for lang_tag in ("markdown", "md"):
+                    if content.startswith(lang_tag):
+                        content = content[len(lang_tag):].strip()
+                        break
+
+            return content
+
+        except Exception as err:
+            raise RuntimeError("Error: Unable to process request. Please try again later.") from err
+
     
     def calculate_costs(self, prompt_tokens: int, completion_tokens: int) -> float:
         """
