@@ -4,6 +4,8 @@ from openai import AsyncOpenAI
 from .image_processing import image_to_base64
 from .types import ModelResult
 from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION, FINAL_REVIEW_PROMPT
+from .config import LLMConfig
+import tiktoken
 
 class LlmModel:
     """
@@ -98,19 +100,30 @@ class LlmModel:
                 
                 # Clean up leading/trailing whitespace
                 content = content.strip()
+    
+            try:
+                total_cost = LLMConfig.get_costs_for_model(self._model_name, usage.prompt_tokens, usage.completion_tokens)
+            except ValueError:
+                total_cost = 0.0
 
             # Extract required information and return a CompletionResult
             return ModelResult(
                 content=content,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
-                cost=self.calculate_costs(usage.prompt_tokens, usage.completion_tokens)
+                cost=total_cost
             )
         except Exception as err:
             raise RuntimeError("Error: Image to markdown LLM call failed") from err
 
 
     async def postprocess_markdown(self, markdowns: List[str]) -> ModelResult:
+
+        input_tokens = self._calculate_tokens(self._model_name, "\n\n".join(markdowns))
+        if input_tokens >= LLMConfig.get_max_tokens_for_model(self._model_name)["output_tokens"]:
+            raise ValueError("Too many tokens to post-process.")
+
+
         # Combine all markdown input into a single string
         separator = "\n\n---PAGE BREAK---\n\n"
         user_content = separator.join(markdowns)
@@ -137,37 +150,31 @@ class LlmModel:
                         content = content[len(lang_tag):].strip()
                         break
 
+            try:
+                total_cost = LLMConfig.get_costs_for_model(self._model_name, response.usage.prompt_tokens, response.usage.completion_tokens)
+            except ValueError:
+                total_cost = 0.0
+
             return ModelResult(
                 content=content,
                 prompt_tokens=response.usage.prompt_tokens,
                 completion_tokens=response.usage.completion_tokens,
-                cost=self.calculate_costs(response.usage.prompt_tokens, response.usage.completion_tokens)
+                cost=total_cost
             )
 
         except Exception as err:
             raise RuntimeError("Error: Post-process LLM call failed.") from err
-
+  
     
-    def calculate_costs(self, prompt_tokens: int, completion_tokens: int) -> float:
+    def _calculate_tokens(self, model_name: str, content: str) -> int:
         """
-        Calculate the cost of the completion based on the token usage.
+        Calculate the number of tokens in the given content.
 
         Args:
-            prompt_tokens (int): The number of tokens used in the prompt.
-            completion_tokens (int): The number of tokens used in the completion.
+            content (str): The content to calculate tokens for.
 
         Returns:
-            float: The cost of the completion.
+            int: The number of tokens.
         """
-        
-        input_token_costs_per_1k = 0.0
-        completion_token_costs_per_1k = 0.0
-
-        if self._model_name == "gpt-4o":
-            input_token_costs_per_1k = 0.00250
-            completion_token_costs_per_1k = 0.01000
-
-        input_token_costs = (prompt_tokens / 1000) * input_token_costs_per_1k
-        completion_token_costs = (completion_tokens / 1000) * completion_token_costs_per_1k
-
-        return input_token_costs + completion_token_costs
+        encoding = tiktoken.encoding_for_model(model_name)
+        return len(encoding.encode(content))
