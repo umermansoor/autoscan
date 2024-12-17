@@ -121,7 +121,7 @@ class LlmModel:
 
         input_tokens = self._calculate_tokens(self._model_name, "\n\n".join(markdowns))
         if input_tokens >= LLMConfig.get_max_tokens_for_model(self._model_name)["output_tokens"]:
-            raise ValueError("Too many tokens to post-process.")
+            raise RuntimeError("Too many tokens to post-process.")
 
 
         # Combine all markdown input into a single string
@@ -176,5 +176,10 @@ class LlmModel:
         Returns:
             int: The number of tokens.
         """
-        encoding = tiktoken.encoding_for_model(model_name)
+        try:
+            encoding = tiktoken.encoding_for_model(model_name)
+        except KeyError:
+            # fallback if model not recognized
+            encoding = tiktoken.get_encoding("cl100k_base")
+
         return len(encoding.encode(content))
