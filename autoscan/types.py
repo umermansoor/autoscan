@@ -10,8 +10,8 @@ class AutoScanOutput:
 
 
 @dataclass
-class ImageToMarkdownResult:
-    page_markdown: str
+class ModelResult:
+    content: str
     prompt_tokens: int
     completion_tokens: int
     cost: float

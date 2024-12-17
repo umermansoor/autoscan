@@ -2,7 +2,7 @@ import os
 from typing import List, Dict, Any, Optional
 from openai import AsyncOpenAI
 from .image_processing import image_to_base64
-from .types import ImageToMarkdownResult
+from .types import ModelResult
 from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION, FINAL_REVIEW_PROMPT
 
 class LlmModel:
@@ -45,7 +45,7 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
-    async def image_to_markdown(self, image_path: str, transcribe_images = False) -> ImageToMarkdownResult:
+    async def image_to_markdown(self, image_path: str, transcribe_images = False) -> ModelResult:
         """
         Generate a markdown representation of a PDF page from an image.
 
@@ -56,7 +56,27 @@ class LlmModel:
         Returns:
             ModelCompletionResult: The generated markdown and token usage details.
         """
-        messages = self._get_messages(image_path=image_path, transcibe_images=transcribe_images)
+
+        base64_image = image_to_base64(image_path)
+        user_content = [
+            {
+                "type": "text",
+                "text": "Convert the following image to markdown."
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{base64_image}"
+                }
+            }
+        ]
+
+        system_prompt = self._system_prompt_image_transcription if transcribe_images else self._system_prompt
+
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content}
+        ]
 
         try:
             response = await self.client.chat.completions.create(
@@ -80,49 +100,17 @@ class LlmModel:
                 content = content.strip()
 
             # Extract required information and return a CompletionResult
-            return ImageToMarkdownResult(
-                page_markdown=content,
+            return ModelResult(
+                content=content,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
                 cost=self.calculate_costs(usage.prompt_tokens, usage.completion_tokens)
             )
         except Exception as err:
-            raise RuntimeError("Error: Unable to process request. Please try again later.") from err
+            raise RuntimeError("Error: Image to markdown LLM call failed") from err
 
-    def _get_messages(self, image_path: str, transcibe_images = False) -> List[Dict[str, Any]]:
-        """
-        Construct the message payload for the LLM.
 
-        Args:
-            image_path (str): The image path of the PDF page.
-
-        Returns:
-            List[Dict[str, Any]]: A list of message objects for the LLM API.
-        """
-        base64_image = image_to_base64(image_path)
-        user_content = [
-            {
-                "type": "text",
-                "text": "Convert the following image to markdown."
-            },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/png;base64,{base64_image}"
-                }
-            }
-        ]
-
-        system_prompt = self._system_prompt_image_transcription if transcibe_images else self._system_prompt
-
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content}
-        ]
-        
-        return messages
-    
-    async def postprocess_markdown(self, markdowns: List[str]) -> str:
+    async def postprocess_markdown(self, markdowns: List[str]) -> ModelResult:
         # Combine all markdown input into a single string
         separator = "\n\n---PAGE BREAK---\n\n"
         user_content = separator.join(markdowns)
@@ -149,10 +137,15 @@ class LlmModel:
                         content = content[len(lang_tag):].strip()
                         break
 
-            return content
+            return ModelResult(
+                content=content,
+                prompt_tokens=response.usage.prompt_tokens,
+                completion_tokens=response.usage.completion_tokens,
+                cost=self.calculate_costs(response.usage.prompt_tokens, response.usage.completion_tokens)
+            )
 
         except Exception as err:
-            raise RuntimeError("Error: Unable to process request. Please try again later.") from err
+            raise RuntimeError("Error: Post-process LLM call failed.") from err
 
     
     def calculate_costs(self, prompt_tokens: int, completion_tokens: int) -> float:

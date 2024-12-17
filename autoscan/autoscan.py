@@ -121,7 +121,9 @@ async def _postprocess_markdown(markdown: List[str], model: LlmModel) -> str:
     Returns:
         The aggregated markdown content.
     """
-    return await model.postprocess_markdown(markdown)
+    result = await model.postprocess_markdown(markdown)
+
+    return result.content
 
 async def _process_images_async(
     pdf_page_images: List[str],
@@ -148,7 +150,7 @@ async def _process_images_async(
     results = await asyncio.gather(*(process_single_image(img) for img in pdf_page_images))
     valid_results = [r for r in results if r]
 
-    aggregated_markdown = [r.page_markdown for r in valid_results]
+    aggregated_markdown = [r.content for r in valid_results]
     total_prompt_tokens = sum(r.prompt_tokens for r in valid_results)
     total_completion_tokens = sum(r.completion_tokens for r in valid_results)
     total_cost = sum(r.cost for r in valid_results)
