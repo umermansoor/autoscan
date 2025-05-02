@@ -81,7 +81,9 @@ class LlmModel:
         if previous_page_markdown:
             user_content.append({
                 "type": "text",
-                "text": f"Here is previous PDF page Markdown:\n\n{previous_page_markdown}"
+                "text": f"## Here’s previous PDF page Markdown. "
+                        f"You must follow the same style and maintain consistency as your output will not have page breaks like PDF:"
+                        f"\n\n{previous_page_markdown}"
             })
 
         system_prompt = self._system_prompt_image_transcription if transcribe_images else self._system_prompt
