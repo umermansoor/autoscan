@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 async def process_file(pdf_path):
     logging.info(f"Processing file: {pdf_path}")
-    await autoscan(pdf_path=pdf_path)
+    await autoscan(pdf_path=pdf_path, contextual_conversion=True)
 
 async def main(pdf_path=None, directory=None):
     if directory:

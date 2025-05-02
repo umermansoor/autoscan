@@ -9,9 +9,9 @@ class PDF2ImageConversionConfig:
 
 
 class LLMConfig:
-    DEFAULT_MODEL = "gpt-4o"
+    DEFAULT_MODEL = "openai/gpt-4o"
     MODEL_PROPERTIES = {
-        "gpt-4o": {
+        "openai/gpt-4o": {
             "max_output_tokens": 16384,
             "max_input_tokens": 128000,
             "input_costs_per_1k_tokens": 0.00250,
