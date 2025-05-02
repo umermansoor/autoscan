@@ -1,6 +1,8 @@
 import os
 from typing import List, Dict, Any, Optional
-from openai import AsyncOpenAI
+
+from litellm import acompletion
+
 from .image_processing import image_to_base64
 from .types import ModelResult
 from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION, FINAL_REVIEW_PROMPT
@@ -13,19 +15,18 @@ class LlmModel:
     using an LLM. It can maintain formatting consistency with previously processed pages.
     """
 
-    def __init__(self, model_name: str = "gpt-4o"):
+    def __init__(self, model_name: str = "openai/gpt-4o"):
         """
         Initialize the LLM model interface.
 
         Args:
-            model_name (str): The model name to use. Defaults to "gpt-4o".
+            model_name (str): The model name to use. Defaults to "openai/gpt-4o".
         """
         self._model_name = model_name
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
         if not "OPENAI_API_KEY" in os.environ:
             raise ValueError("OPENAI_API_KEY environment variable is not set.")
-        self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @property
     def system_prompt(self) -> str:
@@ -47,14 +48,19 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
-    async def image_to_markdown(self, image_path: str, transcribe_images = False) -> ModelResult:
+    async def image_to_markdown(
+            self,
+            image_path: str,
+            transcribe_images=False,
+            previous_page_markdown: Optional[str] = None,
+    ) -> ModelResult:
         """
         Generate a markdown representation of a PDF page from an image.
 
         Args:
             image_path (str): Path to the image file of the PDF page.
             transcribe_images: Describes images in words within the markdown.
-
+            previous_page_markdown: Optional markdown of previous page in PDF file
         Returns:
             ModelCompletionResult: The generated markdown and token usage details.
         """
@@ -72,6 +78,11 @@ class LlmModel:
                 }
             }
         ]
+        if previous_page_markdown:
+            user_content.append({
+                "type": "text",
+                "text": f"Here is previous PDF page Markdown:\n\n{previous_page_markdown}"
+            })
 
         system_prompt = self._system_prompt_image_transcription if transcribe_images else self._system_prompt
 
@@ -81,7 +92,7 @@ class LlmModel:
         ]
 
         try:
-            response = await self.client.chat.completions.create(
+            response = await acompletion(
                 model=self._model_name,
                 messages=messages,
             )
@@ -134,7 +145,7 @@ class LlmModel:
         ]
 
         try:
-            response = await self.client.chat.completions.create(
+            response = await acompletion(
                 model=self._model_name,
                 messages=messages,
             )

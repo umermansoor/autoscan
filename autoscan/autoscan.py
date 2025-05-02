@@ -16,13 +16,14 @@ logger = logging.getLogger(__name__)
 
 async def autoscan(
     pdf_path: str,
-    model_name: str = "gpt-4o",
+    model_name: str = "openai/gpt-4o",
     transcribe_images: bool = True,
     postprocess_markdown: bool = True,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
-    concurrency: Optional[int] = 10 
+    concurrency: Optional[int] = 10,
+    contextual_conversion: bool = False,
 ) -> AutoScanOutput:
     """
     Convert a PDF to markdown by:
@@ -32,7 +33,7 @@ async def autoscan(
 
     ## Args
     - `pdf_path` (str): **Required.** Path to the input PDF file.
-    - `model_name` (str, optional): Name of the AI model to process image-to-text conversion. Defaults to `"gpt-4o"`.
+    - `model_name` (str, optional): Name of the AI model to process image-to-text conversion. Defaults to `"openai/gpt-4o"`.
     - `transcribe_images` (bool, optional): Whether to process images for transcription. Defaults to `True`.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the current directory's "output" subfolder if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
@@ -77,7 +78,7 @@ async def autoscan(
          total_prompt_tokens, 
          total_completion_tokens, 
          total_cost) = await _process_images_async(
-            images, model, transcribe_images, concurrency=concurrency
+            images, model, transcribe_images, concurrency=concurrency, contextual_conversion = contextual_conversion
         )
 
         markdown_content = await _postprocess_markdown(aggregated_markdown, model) if postprocess_markdown else "\n\n".join(aggregated_markdown)
@@ -129,7 +130,8 @@ async def _process_images_async(
     pdf_page_images: List[str],
     model: LlmModel,
     transcribe_images: bool,
-    concurrency: Optional[int] = 10
+    concurrency: Optional[int] = 10,
+    contextual_conversion: bool = False,
 ) -> Tuple[List[str], int, int, float]:
     """
     Process each image using the given model to extract text.
@@ -140,15 +142,25 @@ async def _process_images_async(
 
     context = asyncio.Semaphore(concurrency)
 
-    async def process_single_image(image_path: str):
+    async def process_single_image(image_path: str, previous_page_markdown: Optional[str] = None):
         async with context:
             try:
-                return await model.image_to_markdown(image_path, transcribe_images=transcribe_images)
+                return await model.image_to_markdown(image_path, transcribe_images=transcribe_images,
+                                                     previous_page_markdown=previous_page_markdown)
             except Exception as e:
                 raise LLMProcessingError(f"Error processing image '{image_path}': {e}. Aborting.")
 
-    results = await asyncio.gather(*(process_single_image(img) for img in pdf_page_images))
-    valid_results = [r for r in results if r]
+    if contextual_conversion:
+        valid_results = []
+        last_page_markdown = None
+        for img in pdf_page_images:
+            result = await process_single_image(img, previous_page_markdown=last_page_markdown)
+            if result:
+                valid_results.append(result)
+                last_page_markdown = result.content
+    else:
+        results = await asyncio.gather(*(process_single_image(img) for img in pdf_page_images))
+        valid_results = [r for r in results if r]
 
     aggregated_markdown = [r.content for r in valid_results]
     total_prompt_tokens = sum(r.prompt_tokens for r in valid_results)

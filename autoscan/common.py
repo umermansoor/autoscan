@@ -65,7 +65,7 @@ async def write_text_to_file(filename: str, output_dir: str, text:str) -> Option
     output_path = Path(output_dir) / filename
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    async with aiofiles.open(output_path, mode="w") as f:
+    async with aiofiles.open(output_path, mode="w", encoding="utf-8") as f:
         await f.write(text)
 
     return str(output_path)

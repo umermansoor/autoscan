@@ -9,7 +9,7 @@ from autoscan.types import AutoScanOutput
 async def test_autoscan_successful(tmp_path):
     # Mock inputs
     pdf_path = "sample.pdf"
-    model_name = "gpt-4o"
+    model_name = "openai/gpt-4o"
     output_dir = tmp_path / "output"
     temp_dir = tmp_path / "temp"
 
