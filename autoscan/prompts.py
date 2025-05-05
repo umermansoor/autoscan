@@ -14,6 +14,7 @@ Your task is to accurately convert the content of a single PDF page into properl
     - Do not omit or exclude any content, except:
         - Headers and footers that do not contain meaningful information.
         - Page numbers.
+    - Take previous PDF page Markdown into account if available.
     - If underlining or other emphasis can't be directly represented, default to italics.
     - Retain URLs, but convert them to Markdown links.
     - Use `>` for blockquotes and sidebars.
