@@ -91,7 +91,9 @@ async def autoscan(
     transcribe_images: Optional[bool] = True,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
-    cleanup_temp: bool = True
+    cleanup_temp: bool = True,
+    concurrency: Optional[int] = 10,
+    contextual_conversion: bool = False,
 ) -> AutoScanOutput:
     ...
 ```
