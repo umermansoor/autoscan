@@ -87,11 +87,13 @@ You can configure the model and other parameters in the `autoscan` function:
 ```python
 async def autoscan(
     pdf_path: str, 
-    model_name: str = "gpt-4o",
+    model_name: str = "openai/gpt-4o",
     transcribe_images: Optional[bool] = True,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
-    cleanup_temp: bool = True
+    cleanup_temp: bool = True,
+    concurrency: Optional[int] = 10,
+    contextual_conversion: bool = False,
 ) -> AutoScanOutput:
     ...
 ```
