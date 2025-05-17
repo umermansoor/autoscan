@@ -7,6 +7,7 @@ class AutoScanOutput:
     markdown: str
     input_tokens: int
     output_tokens: int
+    contextual_conversion: bool
 
 
 @dataclass
