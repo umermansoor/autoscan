@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "High quality document (PDF, Doc, etc.) to text conversion"
 authors = ["Umer Mansoor <umermk3@gmail.com>"]
 readme = "README.md"
+[tool.poetry.scripts]
+autoscan = "autoscan.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.12"

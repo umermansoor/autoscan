@@ -98,6 +98,10 @@ async def autoscan(
             f"Tokens Usage - Input: {total_prompt_tokens}, Output: {total_completion_tokens}. "
             f"Cost = ${total_cost:.2f}."
         )
+        logger.info(
+            f"To copy the markdown content to clipboard, run:\n"
+            f"cat {output_filename} | pbcopy"
+        )
 
         return AutoScanOutput(
             completion_time=completion_time,
