@@ -83,7 +83,7 @@ class LlmModel:
                 "type": "text",
                 "text": f"Here is the Markdown from the previous page. "
                         f"Follow the same style; the final output has no page breaks."
-                        f"\n---\n{previous_page_markdown}"
+                        f"\n<!-- PAGE SEPARATOR -->\n{previous_page_markdown}"
             })
 
         system_prompt = self._system_prompt_image_transcription if transcribe_images else self._system_prompt
