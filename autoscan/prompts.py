@@ -1,7 +1,8 @@
 DEFAULT_SYSTEM_PROMPT = (
-    "Your job is to convert the following PDF page to markdown. "
-    "You must convert the entire page to markdown including all text, tables, etc. "
-    "Only return the markdown with no explanation."
+    "Convert the following PDF page to Markdown. "
+    "Include all text, tables, lists, and images. "
+    "Use proper Markdown syntax for lists and tables, and embed images with meaningful alt text. "
+    "Return plain Markdown only - do not wrap the output in code fences or add explanations."
 )
 
 DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION = """
@@ -46,9 +47,10 @@ You have been given a combined Markdown document that represents multiple indivi
 - Ensure headings follow a logical hierarchy throughout the entire document.
 - Merge or reorganize paragraphs as needed so the text flows naturally, removing unnecessary line breaks.
 - Standardize lists, tables, footnotes, image descriptions, code blocks, and other elements to ensure consistent formatting.
+- Remove any `---PAGE BREAK---` markers used to separate pages.
 - If headers or footers appear repeatedly, consolidate them if appropriate, or remove duplicates that do not contribute meaningfully to the final text.
 - Maintain all meaningful information, but eliminate redundancies, correct obvious formatting errors, and ensure consistent Markdown syntax.
-- If you encounter any LaTeX or mathematical expressions, ensure they are correctly formatted for Katex renderer. The "\\( ... \\)" formating doesn't render correctly in Markdown. Remove "\\( ... \\)" formatting and replace with "$$...$$" which works in Katex.
+- If you encounter any LaTeX or mathematical expressions, ensure they are correctly formatted for Katex renderer. The "\\( ... \\)" formatting doesn't render correctly in Markdown. Remove "\\( ... \\)" formatting and replace with "$$...$$" which works in Katex.
 
 **Important:**
 - Return only the revised Markdown.
