@@ -54,10 +54,13 @@ export OPENAI_API_KEY=your_api_key
 
 ## Usage
 
-To run the example script:
+After installing the dependencies (for example with `poetry install`), you can
+run AutoScan directly from the command line:
+
 ```sh
-python example_usage.py
+autoscan path/to/your/file.pdf
 ```
+
 
 ### Example
 
