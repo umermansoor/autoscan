@@ -1,6 +1,7 @@
 import os
 from typing import List, Dict, Any, Optional
 
+import litellm
 from litellm import acompletion
 
 from .image_processing import image_to_base64
@@ -15,14 +16,18 @@ class LlmModel:
     using an LLM. It can maintain formatting consistency with previously processed pages.
     """
 
-    def __init__(self, model_name: str = "openai/gpt-4o"):
+    def __init__(self, model_name: str = "openai/gpt-4o", debug: bool = False):
         """
         Initialize the LLM model interface.
 
         Args:
             model_name (str): The model name to use. Defaults to "openai/gpt-4o".
+            debug (bool): If True, enable litellm debug logging.
         """
         self._model_name = model_name
+        self._debug = debug
+        if debug:
+            litellm._turn_on_debug()
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
         if not "OPENAI_API_KEY" in os.environ:
