@@ -59,6 +59,9 @@ run AutoScan directly from the command line:
 
 ```sh
 autoscan path/to/your/file.pdf
+
+# To process all PDFs in a directory:
+autoscan --directory path/to/your/pdf_directory
 ```
 
 
