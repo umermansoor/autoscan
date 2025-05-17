@@ -65,6 +65,9 @@ autoscan --directory path/to/your/pdf_directory
 
 # Use contextual conversion to maintain style between pages:
 autoscan --contextual-conversion path/to/your/file.pdf
+
+# Enable litellm debug logging to see the raw prompts:
+autoscan --debug path/to/your/file.pdf
 ```
 
 ## Contextual Conversion
@@ -87,7 +90,7 @@ from autoscan.autoscan import autoscan
 
 async def main():
     pdf_path = "path/to/your/pdf_file.pdf"
-    output = await autoscan(pdf_path)
+    output = await autoscan(pdf_path, debug=True)
     print(output.markdown)
 
 asyncio.run(main())
@@ -112,9 +115,11 @@ async def autoscan(
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
     contextual_conversion: bool = False,
+    debug: bool = False,
 ) -> AutoScanOutput:
     ...
 ```
+Set `debug=True` to print the exact prompts being sent to the LLM.
 
 ## Output
 The output of the `autoscan` function includes:

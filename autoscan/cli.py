@@ -8,18 +8,18 @@ from .autoscan import autoscan
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-async def _process_file(pdf_path: str, contextual_conversion: bool) -> None:
+async def _process_file(pdf_path: str, contextual_conversion: bool, debug: bool = False) -> None:
     logging.info(f"Processing file: {pdf_path}")
-    await autoscan(pdf_path=pdf_path, contextual_conversion=contextual_conversion)
+    await autoscan(pdf_path=pdf_path, contextual_conversion=contextual_conversion, debug=debug)
 
-async def _run(pdf_path: str | None = None, directory: str | None = None, contextual_conversion: bool = False) -> None:
+async def _run(pdf_path: str | None = None, directory: str | None = None, contextual_conversion: bool = False, debug: bool = False) -> None:
     if directory:
         logging.info(f"Processing all PDF files in directory: {directory}")
         for file_name in os.listdir(directory):
             if file_name.lower().endswith(".pdf"):
-                await _process_file(os.path.join(directory, file_name), contextual_conversion)
+                await _process_file(os.path.join(directory, file_name), contextual_conversion, debug)
     elif pdf_path:
-        await _process_file(pdf_path, contextual_conversion)
+        await _process_file(pdf_path, contextual_conversion, debug)
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -38,6 +38,11 @@ def main() -> None:
         "--contextual-conversion",
         action="store_true",
         help="Use previous page markdown when processing subsequent pages",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable litellm debug logging",
     )
 
     args = parser.parse_args()
@@ -60,6 +65,7 @@ def main() -> None:
             pdf_path=args.pdf_path,
             directory=args.directory,
             contextual_conversion=args.contextual_conversion,
+            debug=args.debug,
         )
     )
 
