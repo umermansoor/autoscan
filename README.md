@@ -62,7 +62,19 @@ autoscan path/to/your/file.pdf
 
 # To process all PDFs in a directory:
 autoscan --directory path/to/your/pdf_directory
+
+# Use contextual conversion to maintain style between pages:
+autoscan --contextual-conversion path/to/your/file.pdf
 ```
+
+## Contextual Conversion
+
+Contextual conversion passes the Markdown from each page to the next page's conversion step. This helps the model
+maintain a consistent voice and formatting across pages.
+
+Enable this feature on the command line with `--contextual-conversion` or programmatically by passing
+`contextual_conversion=True` to the `autoscan` function. The returned `AutoScanOutput` includes the flag so you can
+verify whether it was used.
 
 
 ### Example
@@ -112,6 +124,7 @@ The output of the `autoscan` function includes:
 - `markdown`: The aggregated Markdown content.
 - `input_tokens`: Number of input tokens used.
 - `output_tokens`: Number of output tokens generated.
+- `contextual_conversion`: Whether contextual page processing was enabled.
 
 ## Examples
 

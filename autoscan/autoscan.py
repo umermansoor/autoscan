@@ -92,12 +92,17 @@ async def autoscan(
         if not output_filename:
             raise MarkdownFileWriteError(f"Failed to write markdown file: {output_filename}")
 
-        logger.info(
-            f"Autoscan completed in {completion_time:.2f} seconds. "
-            f"Markdown file: {output_filename}. "
-            f"Tokens Usage - Input: {total_prompt_tokens}, Output: {total_completion_tokens}. "
-            f"Cost = ${total_cost:.2f}."
+        summary = "\n".join(
+            [
+                "AutoScan completed:",
+                f"  Output file      : {output_filename}",
+                f"  Completion time  : {completion_time:.2f} seconds",
+                f"  Tokens (in/out)  : {total_prompt_tokens}/{total_completion_tokens}",
+                f"  Cost             : ${total_cost:.2f}",
+                f"  Contextual mode  : {contextual_conversion}",
+            ]
         )
+        logger.info(summary)
         logger.info(
             f"To copy the markdown content to clipboard, run:\n"
             f"cat {output_filename} | pbcopy"
@@ -109,6 +114,7 @@ async def autoscan(
             markdown=markdown_content,
             input_tokens=total_prompt_tokens,
             output_tokens=total_completion_tokens,
+            contextual_conversion=contextual_conversion,
         )
     finally:
         # Clean up temp files if requested
