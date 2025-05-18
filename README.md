@@ -2,7 +2,7 @@
 
 AutoScan converts PDF files into Markdown using LLMs (e.g., GPT or Gemini). It is designed for smaller yet complex documents that require high fidelity—for example, medical documents, invoices, or other official forms. The resulting Markdown can then be fed into another LLM for downstream processing. 
 
-When perfect accuracy is not essential, faster and cheaper alternatives (e.g., [PyMuPDF4LLM](https://pymupdf.readthedocs.io/en/latest/pymupdf4llm/)) may be more suitable. Using higher accuracy modes in AutoScan will take more time and use more tokens (increasing cost).
+When perfect accuracy is not essential, faster and cheaper alternatives (e.g. [PyMuPDF4LLM](https://pymupdf.readthedocs.io/en/latest/pymupdf4llm/)) may be more suitable. Using higher accuracy modes in AutoScan will take more time and use more tokens (increasing cost).
 
 ## Features
 
@@ -65,7 +65,7 @@ Replace `your_api_key` with your actual OpenAI API key.
 
 ## **Usage**
 
-After installing dependencies (e.g., `poetry install`), run `autoscan` from the command line:
+After installing dependencies (e.g. `poetry install`), run `autoscan` from the command line:
 
 ```sh
 autoscan path/to/your/file.pdf

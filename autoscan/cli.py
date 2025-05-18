@@ -29,11 +29,7 @@ def main() -> None:
         description="Run autoscan on a PDF file or all PDF files in a directory."
     )
     parser.add_argument("pdf_path", nargs="?", help="Path to a single PDF file")
-    parser.add_argument(
-        "--directory",
-        type=str,
-        help="Path to a directory containing PDF files",
-    )
+
     parser.add_argument(
         "--accuracy",
         type=str,
