@@ -51,17 +51,27 @@ choco install poppler
 scoop install poppler
 ```
 
-### 3. Set your `OPENAI_API_KEY`
+### 3. Set your API key
 
-**macOS/Linux**:
+Depending on the model provider you choose, set the appropriate environment variable:
+
+- **OpenAI**: `OPENAI_API_KEY`
+- **Anthropic (Claude)**: `ANTHROPIC_API_KEY`
+- **Google Gemini**: `GOOGLE_API_KEY` or `GEMINI_API_KEY` if using Google AI Studio (e.g.   `gemini/gemini-2.0-flash`)
+
+**macOS/Linux example**:
 
 `export OPENAI_API_KEY=your_api_key`
 
-**Windows**:
+**Windows example**:
 
 `$env:OPENAI_API_KEY="your_api_key"`
 
-Replace `your_api_key` with your actual OpenAI API key.
+Replace `your_api_key` with your actual provider API key.
+AutoScan will check for the appropriate variable based on the
+provider prefix in the `--model` option. For example, if you use
+`--model anthropic/claude-3-sonnet-20240229`, ensure
+`ANTHROPIC_API_KEY` is defined.
 
 ## **Usage**
 
@@ -72,13 +82,16 @@ autoscan path/to/your/file.pdf
 
 # Choose accuracy level (low, medium, high):
 autoscan --accuracy high path/to/your/file.pdf
+
+# Specify a model (default is `openai/gpt-4o`):
+autoscan --model gemini/gemini-2.0-flash path/to/your/file.pdf
 ```
 
-### **Accuracy Levels**
+### Accuracy Levels
 
 `low`, `medium`, and `high` are supported. Higher accuracy processes pages sequentially and performs an additional review step, which increases token usage (cost) and runtime.
 
-### **Programmatic Example**
+### Programmatic Example
 
 You can also invoke AutoScan in your Python code:
 
@@ -100,7 +113,7 @@ asyncio.run(main())
 2. **Process Images with LLM**: The images are processed by the LLM to generate Markdown.
 3. **Aggregate Markdown**: All Markdown output is combined into one file (on `accuracy==low` markdowns are combined together using a simple algorithm; on `accuracy==medium,high` an LLM is used to combine all outputs together)
 
-## **Configuration**
+## Configuration
 
 Configure models and other parameters using the `autoscan` function signature:
 

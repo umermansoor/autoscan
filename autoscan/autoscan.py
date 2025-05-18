@@ -179,7 +179,9 @@ async def _process_images_async(
                     previous_page_markdown=previous_page_markdown,
                 )
             except Exception as e:
-                raise LLMProcessingError(f"Error processing image '{image_path}': {e}. Aborting.")
+                raise LLMProcessingError(
+                    f"Error processing image '{image_path}': {e}"
+                ) from e
 
     if sequential:
         valid_results = []
