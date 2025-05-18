@@ -1,78 +1,86 @@
 # AutoScan
 
-AutoScan is a tool that converts PDF files to Markdown using AI. It extracts text, handles images, and even decodes handwriting to produce clean and structured Markdown documents.
+AutoScan converts PDF files into Markdown using LLMs (e.g., GPT or Gemini). It is designed for smaller yet complex documents that require high fidelity—for example, medical documents, invoices, or other official forms. The resulting Markdown can then be fed into another LLM for downstream processing. 
+
+When perfect accuracy is not essential, faster and cheaper alternatives (e.g. [PyMuPDF4LLM](https://pymupdf.readthedocs.io/en/latest/pymupdf4llm/)) may be more suitable. Using higher accuracy modes in AutoScan will take more time and use more tokens (increasing cost).
 
 ## Features
 
-- **Accurate Conversion**: Faithfully translates complex PDF layouts into Markdown without losing formatting.
-- **Image Transcription**: Provides descriptive summaries for images instead of embedding them.
-- **Handwriting OCR**: Converts handwritten text into Markdown.
-- **Multi-language Support**: Handles multiple languages.
-- **Metadata Extraction**: Extracts titles, authors, and other metadata.
+- **High accuracy** conversion of complex PDFs to Markdown, preserving tables and layout.
+- **Image transcription** so visuals are described in text rather than embedded.
+- **Handwriting OCR** when handwritten notes are present.
+- **Multi-language** support.
+- **Works with any LLM** via [LiteLLM](https://github.com/BerriAI/litellm).
 
-![Example 1 ](https://private-user-images.githubusercontent.com/862952/395720191-296f93c4-8f04-4771-887c-08c45fdd1d95.png)
-
-![Example 2](https://private-user-images.githubusercontent.com/862952/395720236-44d3ea28-2ca8-4d86-ab79-29683e5529c1.png)
+![Example 1](assets/pdf_to_md_eg_1.png)
+![Example 2](assets/pdf_to_md_eg_2.png)
 
 ## Installation
 
-To install the required dependencies, run:
+### 1. Install Python dependencies
 
-```sh
+```bash
 poetry install
 ```
 
-### Install `poppler`
+### 2. Install `poppler`
 
-#### On Mac
+AutoScan uses [Poppler](https://poppler.freedesktop.org/) to convert PDF pages to images.
+
+**macOS**:
 
 ```sh
 brew install poppler
 ```
 
-#### On Linux: 
+**Linux**:
 
 ```sh
 sudo apt-get install poppler-utils
 ```
 
-### To Test
+**Windows**:  
+You can use a package manager like [Chocolatey](https://chocolatey.org/) or [Scoop](https://scoop.sh/):
 
-To run tests:
-
-```sh
-poetry run pytest tests/
-```
-
-## Set `OPENAI_API_KEY`
-
-### On Mac/Linux
 
 ```sh
-export OPENAI_API_KEY=your_api_key
+choco install poppler
+``` 
+
+```sh
+scoop install poppler
 ```
 
-## Usage
+### 3. Set your `OPENAI_API_KEY`
 
-After installing the dependencies (for example with `poetry install`), you can
-run AutoScan directly from the command line:
+**macOS/Linux**:
+
+`export OPENAI_API_KEY=your_api_key`
+
+**Windows**:
+
+`$env:OPENAI_API_KEY="your_api_key"`
+
+Replace `your_api_key` with your actual OpenAI API key.
+
+## **Usage**
+
+After installing dependencies (e.g. `poetry install`), run `autoscan` from the command line:
 
 ```sh
 autoscan path/to/your/file.pdf
 
-# To process all PDFs in a directory:
-autoscan --directory path/to/your/pdf_directory
-
 # Choose accuracy level (low, medium, high):
 autoscan --accuracy high path/to/your/file.pdf
-
-# Enable litellm debug logging to see the raw prompts:
-autoscan --debug path/to/your/file.pdf
 ```
 
-### Example
+### **Accuracy Levels**
 
-Here is an example of how to use AutoScan programmatically:
+`low`, `medium`, and `high` are supported. Higher accuracy processes pages sequentially and performs an additional review step, which increases token usage (cost) and runtime.
+
+### **Programmatic Example**
+
+You can also invoke AutoScan in your Python code:
 
 ```python
 import asyncio
@@ -88,12 +96,13 @@ asyncio.run(main())
 
 ## How It Works
 
-1. Convert PDF to Images: Each page of the PDF is converted into an image.
-2. Process Images with LLM: The images are processed by a language model to generate Markdown.
-3. Aggregate Markdown: The generated Markdown for each page is aggregated into a single file.
+1. **Convert PDF to Images**: Each page of the PDF is converted into an image.
+2. **Process Images with LLM**: The images are processed by the LLM to generate Markdown.
+3. **Aggregate Markdown**: All Markdown output is combined into one file (on `accuracy==low` markdowns are combined together using a simple algorithm; on `accuracy==medium,high` an LLM is used to combine all outputs together)
 
-## Configuration
-You can configure the model and other parameters in the `autoscan` function:
+## **Configuration**
+
+Configure models and other parameters using the `autoscan` function signature:
 
 ```python
 async def autoscan(
@@ -101,32 +110,34 @@ async def autoscan(
     model_name: str = "openai/gpt-4o",
     accuracy: str = "medium",
     transcribe_images: Optional[bool] = True,
-    output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
     debug: bool = False,
 ) -> AutoScanOutput:
-    ...
 ```
-Set `debug=True` to print the exact prompts being sent to the LLM.
+
+Set `debug=True` to print the exact prompts sent to the LLM.
 
 ## Output
-The output of the `autoscan` function includes:
 
-- `completion_time`: Time taken to complete the conversion.
-- `markdown_file`: Path to the generated Markdown file.
-- `markdown`: The aggregated Markdown content.
-- `input_tokens`: Number of input tokens used.
-- `output_tokens`: Number of output tokens generated.
-- `accuracy`: The accuracy level used for processing.
+The `autoscan` function returns an object with the following attributes:
+
+* **completion_time**: Time taken to complete the conversion.  
+* **markdown_file**: Path to the generated Markdown file.  
+* **markdown**: The aggregated Markdown content.  
+* **input_tokens**: Number of input tokens used.  
+* **output_tokens**: Number of output tokens generated.  
+* **accuracy**: The accuracy level used.
 
 ## Examples
 
-You can find example Markdown files generated by AutoScan in the `examples` directory:
+Sample PDFs are available in the `examples` directory for testing and demonstration.
 
-- [examples/helloworld2.md](./examples/helloworld2.md)
-- [examples/helloworld.md](./examples/helloworld.md)
+## Testing
 
+To run the test suite:
 
-
+```sh
+poetry run pytest tests/
+```
