@@ -16,7 +16,7 @@ class LlmModel:
     using an LLM. It can maintain formatting consistency with previously processed pages.
     """
 
-    def __init__(self, model_name: str = "openai/gpt-4o", debug: bool = False):
+    def __init__(self, model_name: str = "openai/gpt-4o", debug: bool = False, accuracy: str = "medium"):
         """
         Initialize the LLM model interface.
 
@@ -26,10 +26,16 @@ class LlmModel:
         """
         self._model_name = model_name
         self._debug = debug
+        self._accuracy = accuracy
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
         if not "OPENAI_API_KEY" in os.environ:
             raise ValueError("OPENAI_API_KEY environment variable is not set.")
+
+    @property
+    def accuracy(self) -> str:
+        """Return the accuracy level for this model."""
+        return self._accuracy
 
     @property
     def system_prompt(self) -> str:
