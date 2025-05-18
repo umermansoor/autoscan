@@ -1,4 +1,5 @@
 import os
+import logging
 from typing import List, Dict, Any, Optional
 
 import litellm
@@ -11,6 +12,8 @@ from .config import LLMConfig
 from .utils.env import ensure_env_for_model
 import tiktoken
 from .errors import LLMProcessingError
+
+logger = logging.getLogger(__name__)
 
 class LlmModel:
     """
@@ -32,6 +35,24 @@ class LlmModel:
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
         ensure_env_for_model(model_name)
+
+        if self._debug and hasattr(litellm, "set_verbose"):
+            try:
+                litellm.set_verbose(True)
+            except Exception:
+                logger.debug("Failed to enable litellm verbose mode")
+
+    @staticmethod
+    def _strip_code_fences(content: str) -> str:
+        """Remove enclosing triple backticks and optional language tags."""
+        if content.startswith("```") and content.endswith("```"):
+            content = content.removeprefix("```").removesuffix("```")
+            for lang_tag in ("markdown", "md"):
+                if content.startswith(lang_tag):
+                    content = content[len(lang_tag):]
+                    break
+            content = content.strip()
+        return content
 
     @property
     def accuracy(self) -> str:
@@ -75,6 +96,7 @@ class LlmModel:
             ModelCompletionResult: The generated markdown and token usage details.
         """
 
+        logger.debug(f"Converting image {image_path} to markdown")
         base64_image = image_to_base64(image_path)
         user_content = [
             {
@@ -104,37 +126,30 @@ class LlmModel:
         ]
 
         if self._debug:
-            system_prompt = system_prompt
-            print(f"System prompt: {system_prompt}")
+            logger.debug(f"System prompt: {system_prompt}")
             for item in user_content:
                 if item["type"] == "text":
-                    print(f"User content: {item['text']}")
+                    logger.debug(f"User content: {item['text']}")
 
         try:
             response = await acompletion(
                 model=self._model_name,
                 messages=messages,
             )
-            content = response.choices[0].message.content.strip()
+            content = self._strip_code_fences(response.choices[0].message.content.strip())
             usage = response.usage  # Extract token usage
-
-            if content.startswith("```") and content.endswith("```"):
-                # Remove leading and trailing triple backticks
-                content = content.removeprefix("```").removesuffix("```")
-                
-                # Remove optional language specifiers at the start
-                for lang_tag in ("markdown", "md"):
-                    if content.startswith(lang_tag):
-                        content = content[len(lang_tag):]
-                        break
-                
-                # Clean up leading/trailing whitespace
-                content = content.strip()
     
             try:
                 total_cost = LLMConfig.get_costs_for_model(self._model_name, usage.prompt_tokens, usage.completion_tokens)
-            except ValueError:
+            except ValueError as e:
+                logger.error(f"Cost calculation failed: {e}")
                 total_cost = 0.0
+            logger.debug(
+                "Tokens prompt=%s completion=%s cost=%s",
+                usage.prompt_tokens,
+                usage.completion_tokens,
+                total_cost,
+            )
 
             # Extract required information and return a CompletionResult
             return ModelResult(
@@ -150,6 +165,7 @@ class LlmModel:
 
 
     async def postprocess_markdown(self, markdowns: List[str]) -> ModelResult:
+        logger.debug("Post-processing %s markdown chunks", len(markdowns))
 
         input_tokens = self._calculate_tokens(self._model_name, "\n\n".join(markdowns))
         if input_tokens >= LLMConfig.get_max_tokens_for_model(self._model_name)["output_tokens"]:
@@ -166,30 +182,27 @@ class LlmModel:
         ]
 
         if self._debug:
-            print(f"System prompt: {FINAL_REVIEW_PROMPT}")
-            print(f"User content: {user_content}")
+            logger.debug(f"System prompt: {FINAL_REVIEW_PROMPT}")
+            logger.debug(f"User content: {user_content}")
 
         try:
             response = await acompletion(
                 model=self._model_name,
                 messages=messages,
             )
-            content = response.choices[0].message.content.strip()
-
-            # Remove enclosing triple backticks if present
-            if content.startswith("```") and content.endswith("```"):
-                content = content.removeprefix("```").removesuffix("```").strip()
-
-                # Remove optional language specifiers
-                for lang_tag in ("markdown", "md"):
-                    if content.startswith(lang_tag):
-                        content = content[len(lang_tag):].strip()
-                        break
+            content = self._strip_code_fences(response.choices[0].message.content.strip())
 
             try:
                 total_cost = LLMConfig.get_costs_for_model(self._model_name, response.usage.prompt_tokens, response.usage.completion_tokens)
-            except ValueError:
+            except ValueError as e:
+                logger.error(f"Cost calculation failed: {e}")
                 total_cost = 0.0
+            logger.debug(
+                "Tokens prompt=%s completion=%s cost=%s",
+                response.usage.prompt_tokens,
+                response.usage.completion_tokens,
+                total_cost,
+            )
 
             return ModelResult(
                 content=content,
@@ -219,5 +232,6 @@ class LlmModel:
         except KeyError:
             # fallback if model not recognized
             encoding = tiktoken.get_encoding("cl100k_base")
-
-        return len(encoding.encode(content))
+        token_count = len(encoding.encode(content))
+        logger.debug("Calculated %s tokens for model %s", token_count, model_name)
+        return token_count
