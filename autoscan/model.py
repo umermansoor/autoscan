@@ -26,8 +26,6 @@ class LlmModel:
         """
         self._model_name = model_name
         self._debug = debug
-        if debug:
-            litellm._turn_on_debug()
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
         if not "OPENAI_API_KEY" in os.environ:
@@ -86,9 +84,9 @@ class LlmModel:
         if previous_page_markdown:
             user_content.append({
                 "type": "text",
-                "text": f"Here is the Markdown from the previous page. "
-                        f"Follow the same style; the final output has no page breaks."
-                        f"\n<!-- PAGE SEPARATOR -->\n{previous_page_markdown}"
+                "text": f"Here are the last 50 characters in Markdown format from the previous page to provide you context. "
+                        f"The final output has no page breaks."
+                        f"\n<!-- PAGE SEPARATOR -->\n{previous_page_markdown[-100:]}"
             })
 
         system_prompt = self._system_prompt_image_transcription if transcribe_images else self._system_prompt
@@ -97,6 +95,13 @@ class LlmModel:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content}
         ]
+
+        if self._debug:
+            system_prompt = system_prompt
+            print(f"System prompt: {system_prompt}")
+            for item in user_content:
+                if item["type"] == "text":
+                    print(f"User content: {item['text']}")
 
         try:
             response = await acompletion(
@@ -150,6 +155,10 @@ class LlmModel:
             {"role": "system", "content": FINAL_REVIEW_PROMPT},
             {"role": "user", "content": user_content}
         ]
+
+        if self._debug:
+            print(f"System prompt: {FINAL_REVIEW_PROMPT}")
+            print(f"User content: {user_content}")
 
         try:
             response = await acompletion(
