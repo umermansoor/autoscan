@@ -1,6 +1,6 @@
 # AutoScan
 
-AutoScan converts PDF files into Markdown using AI. It is designed for small but complex documents that require very high fidelity—for example, detailed lab reports, invoices or other official forms. The resulting Markdown can then be fed into another large language model for downstream processing. When perfect accuracy is not essential, faster and cheaper alternatives may be more suitable. Using higher accuracy modes will also take more time and consume more tokens (increasing cost).
+AutoScan converts PDF files into Markdown using LLMs like GPT or Gemini. It is designed for small but complex documents that require very high fidelity—for example, medical documents, invoices or other official forms. The resulting Markdown can then be fed into another LLM for downstream processing. When perfect accuracy is not essential, faster and cheaper alternatives may be more suitable e.g. [PyMuPDF4LLM](https://pymupdf.readthedocs.io/en/latest/pymupdf4llm/). Using higher accuracy modes will also take more time and consume more tokens (increasing cost).
 
 ## Features
 
@@ -8,12 +8,11 @@ AutoScan converts PDF files into Markdown using AI. It is designed for small but
 - **Image transcription** so visuals are described in text rather than embedded.
 - **Handwriting OCR** when handwritten notes are present.
 - **Multi-language** support.
-- **Metadata extraction** for titles, authors and more.
 - **Works with any LLM** through the [LiteLLM](https://github.com/BerriAI/litellm) library.
 
-![Example 1 ](https://private-user-images.githubusercontent.com/862952/395720191-296f93c4-8f04-4771-887c-08c45fdd1d95.png)
+![Example 1 ](assets/pdf_to_md_eg_1.png)
 
-![Example 2](https://private-user-images.githubusercontent.com/862952/395720236-44d3ea28-2ca8-4d86-ab79-29683e5529c1.png)
+![Example 2](assets/pdf_to_md_eg_1.png)
 
 ## Installation
 
@@ -24,6 +23,8 @@ poetry install
 ```
 
 ### Install `poppler`
+
+[Poppler](https://poppler.freedesktop.org/) is a PDF rendering library that Autoscan uses to convert PDF pages to images.
 
 #### On Mac
 
@@ -37,13 +38,6 @@ brew install poppler
 sudo apt-get install poppler-utils
 ```
 
-### To Test
-
-To run tests:
-
-```sh
-poetry run pytest tests/
-```
 
 ## Set `OPENAI_API_KEY`
 
@@ -131,4 +125,10 @@ The output of the `autoscan` function includes:
 Sample PDFs for testing are available in the `examples` directory.
 
 
+### To Test
 
+To run tests:
+
+```sh
+poetry run pytest tests/
+```
