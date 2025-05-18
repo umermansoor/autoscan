@@ -164,13 +164,14 @@ async def test_autoscan_with_custom_concurrency(tmp_path):
         result = await autoscan(pdf_path, temp_dir=str(temp_dir), output_dir=str(output_dir), concurrency=2)
         assert result is not None
         # Check that _process_images_async was called with concurrency=2
-        mock_process.assert_called_with(["image1.png", "image2.png", "image3.png"], 
-                                        mock_process.call_args[0][1],  # model (mocked)
-                                        True,  # transcribe_images default
-                                        concurrency=2)
+        mock_process.assert_called_with(["image1.png", "image2.png", "image3.png"],
+                                        mock_process.call_args[0][1],
+                                        True,
+                                        concurrency=2,
+                                        sequential=False)
 
 @pytest.mark.asyncio
-async def test_process_images_async_contextual():
+async def test_process_images_async_sequential():
     images = ["p1.png", "p2.png", "p3.png"]
     calls = []
 
@@ -184,7 +185,7 @@ async def test_process_images_async_contextual():
     model.image_to_markdown.side_effect = fake_image_to_markdown
 
     result = await autoscan_module._process_images_async(
-        images, model, True, concurrency=2, contextual_conversion=True
+        images, model, True, concurrency=2, sequential=True
     )
 
     assert calls == [None, "md_p1.png", "md_p2.png"]

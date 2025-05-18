@@ -63,22 +63,12 @@ autoscan path/to/your/file.pdf
 # To process all PDFs in a directory:
 autoscan --directory path/to/your/pdf_directory
 
-# Use contextual conversion to maintain style between pages:
-autoscan --contextual-conversion path/to/your/file.pdf
+# Choose accuracy level (low, medium, high):
+autoscan --accuracy high path/to/your/file.pdf
 
 # Enable litellm debug logging to see the raw prompts:
 autoscan --debug path/to/your/file.pdf
 ```
-
-## Contextual Conversion
-
-Contextual conversion passes the Markdown from each page to the next page's conversion step. This helps the model
-maintain a consistent voice and formatting across pages.
-
-Enable this feature on the command line with `--contextual-conversion` or programmatically by passing
-`contextual_conversion=True` to the `autoscan` function. The returned `AutoScanOutput` includes the flag so you can
-verify whether it was used.
-
 
 ### Example
 
@@ -107,14 +97,14 @@ You can configure the model and other parameters in the `autoscan` function:
 
 ```python
 async def autoscan(
-    pdf_path: str, 
+    pdf_path: str,
     model_name: str = "openai/gpt-4o",
+    accuracy: str = "medium",
     transcribe_images: Optional[bool] = True,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
-    contextual_conversion: bool = False,
     debug: bool = False,
 ) -> AutoScanOutput:
     ...
@@ -129,7 +119,7 @@ The output of the `autoscan` function includes:
 - `markdown`: The aggregated Markdown content.
 - `input_tokens`: Number of input tokens used.
 - `output_tokens`: Number of output tokens generated.
-- `contextual_conversion`: Whether contextual page processing was enabled.
+- `accuracy`: The accuracy level used for processing.
 
 ## Examples
 

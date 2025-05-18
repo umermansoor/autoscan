@@ -17,13 +17,12 @@ logger = logging.getLogger(__name__)
 async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
+    accuracy: str = "medium",
     transcribe_images: bool = True,
-    postprocess_markdown: bool = True,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
-    contextual_conversion: bool = False,
     debug: bool = False,
 ) -> AutoScanOutput:
     """
@@ -35,6 +34,7 @@ async def autoscan(
     ## Args
     - `pdf_path` (str): **Required.** Path to the input PDF file.
     - `model_name` (str, optional): Name of the AI model to process image-to-text conversion. Defaults to `"openai/gpt-4o"`.
+    - `accuracy` (str, optional): One of `low`, `medium`, or `high` determining processing strategy. Defaults to `"medium"`.
     - `transcribe_images` (bool, optional): Whether to process images for transcription. Defaults to `True`.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the current directory's "output" subfolder if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
@@ -72,18 +72,31 @@ async def autoscan(
         logger.info(f"Generated {len(images)} page images from PDF.")
 
         # Initialize the LLM
-        model = LlmModel(model_name=model_name, debug=debug)
+        model = LlmModel(model_name=model_name, debug=debug, accuracy=accuracy)
         logger.info(f"Initialized model: {model_name}")
 
         # Process images
-        (aggregated_markdown, 
-         total_prompt_tokens, 
-         total_completion_tokens, 
+        if accuracy not in {"low", "medium", "high"}:
+            raise ValueError("accuracy must be one of 'low', 'medium', or 'high'")
+
+        sequential = accuracy == "high"
+        do_postprocess = accuracy in {"medium", "high"}
+
+        (aggregated_markdown,
+         total_prompt_tokens,
+         total_completion_tokens,
          total_cost) = await _process_images_async(
-            images, model, transcribe_images, concurrency=concurrency, contextual_conversion = contextual_conversion
+            images,
+            model,
+            transcribe_images,
+            concurrency=concurrency,
+            sequential=sequential,
         )
 
-        markdown_content = await _postprocess_markdown(aggregated_markdown, model) if postprocess_markdown else "\n\n".join(aggregated_markdown)
+        if do_postprocess:
+            markdown_content = await _postprocess_markdown(aggregated_markdown, model)
+        else:
+            markdown_content = "\n\n".join(aggregated_markdown).replace("---PAGE BREAK---", "")
 
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
@@ -101,7 +114,7 @@ async def autoscan(
                 f"  Completion time  : {completion_time:.2f} seconds",
                 f"  Tokens (in/out)  : {total_prompt_tokens}/{total_completion_tokens}",
                 f"  Cost             : ${total_cost:.2f}",
-                f"  Contextual mode  : {contextual_conversion}",
+                f"  Accuracy         : {accuracy}",
             ]
         )
         logger.info(summary)
@@ -116,7 +129,7 @@ async def autoscan(
             markdown=markdown_content,
             input_tokens=total_prompt_tokens,
             output_tokens=total_completion_tokens,
-            contextual_conversion=contextual_conversion,
+            accuracy=accuracy,
         )
     finally:
         # Clean up temp files if requested
@@ -143,10 +156,13 @@ async def _process_images_async(
     model: LlmModel,
     transcribe_images: bool,
     concurrency: Optional[int] = 10,
-    contextual_conversion: bool = False,
+    sequential: bool = False,
 ) -> Tuple[List[str], int, int, float]:
     """
     Process each image using the given model to extract text.
+
+    When ``sequential`` is True, each page is processed one after another and
+    the markdown from the previous page is provided as context to the next.
     """
 
     if not concurrency:
@@ -157,12 +173,15 @@ async def _process_images_async(
     async def process_single_image(image_path: str, previous_page_markdown: Optional[str] = None):
         async with context:
             try:
-                return await model.image_to_markdown(image_path, transcribe_images=transcribe_images,
-                                                     previous_page_markdown=previous_page_markdown)
+                return await model.image_to_markdown(
+                    image_path,
+                    transcribe_images=transcribe_images,
+                    previous_page_markdown=previous_page_markdown,
+                )
             except Exception as e:
                 raise LLMProcessingError(f"Error processing image '{image_path}': {e}. Aborting.")
 
-    if contextual_conversion:
+    if sequential:
         valid_results = []
         last_page_markdown = None
         for img in pdf_page_images:
