@@ -8,6 +8,7 @@ from .image_processing import image_to_base64
 from .types import ModelResult
 from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION, FINAL_REVIEW_PROMPT
 from .config import LLMConfig
+from .utils.env import ensure_env_for_model
 import tiktoken
 
 class LlmModel:
@@ -29,8 +30,7 @@ class LlmModel:
         self._accuracy = accuracy
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
-        if not "OPENAI_API_KEY" in os.environ:
-            raise ValueError("OPENAI_API_KEY environment variable is not set.")
+        ensure_env_for_model(model_name)
 
     @property
     def accuracy(self) -> str:

@@ -51,17 +51,27 @@ choco install poppler
 scoop install poppler
 ```
 
-### 3. Set your `OPENAI_API_KEY`
+### 3. Set your API key
 
-**macOS/Linux**:
+Depending on the model provider you choose, set the appropriate environment variable:
+
+- **OpenAI**: `OPENAI_API_KEY`
+- **Anthropic (Claude)**: `ANTHROPIC_API_KEY`
+- **Google Gemini**: `GOOGLE_API_KEY`
+
+**macOS/Linux example**:
 
 `export OPENAI_API_KEY=your_api_key`
 
-**Windows**:
+**Windows example**:
 
 `$env:OPENAI_API_KEY="your_api_key"`
 
-Replace `your_api_key` with your actual OpenAI API key.
+Replace `your_api_key` with your actual provider API key.
+AutoScan will check for the appropriate variable based on the
+provider prefix in the `--model` option. For example, if you use
+`--model anthropic/claude-3-sonnet-20240229`, ensure
+`ANTHROPIC_API_KEY` is defined.
 
 ## **Usage**
 
@@ -72,6 +82,9 @@ autoscan path/to/your/file.pdf
 
 # Choose accuracy level (low, medium, high):
 autoscan --accuracy high path/to/your/file.pdf
+
+# Specify a model (default is `openai/gpt-4o`):
+autoscan --model anthropic/claude-3-sonnet-20240229 path/to/your/file.pdf
 ```
 
 ### **Accuracy Levels**
