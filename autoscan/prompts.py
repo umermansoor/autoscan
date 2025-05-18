@@ -11,16 +11,14 @@ Your task is to accurately convert the content of a single PDF page into properl
 ## Instructions
 
 1. **General Guidelines:**
-    - Convert **all** textual content from the PDF page into Markdown, including headers, paragraphs, lists, tables, footnotes, side notes, captions, headers, and footers.
-    - Do not omit or exclude any content, except:
-        - Headers and footers that do not contain meaningful information.
-        - Page numbers.
-    - Take previous PDF page Markdown into account if available.
-    - If underlining or other emphasis can't be directly represented, default to italics.
-    - Retain URLs, but convert them to Markdown links.
+    - Convert **all** meaningful textual content from the PDF page into Markdown. This includes: 
+        - Headings, paragraphs, lists, footnotes, side notes, captions, and any other text blocks.
+        - **Do not** include page numbers or repetitive headers/footers with no meaningful content. 
+    - If underlining or other emphasis can't be directly represented, default to italics  (`*...*` or `_..._`).
+    - Retain URLs, but convert them to Markdown links: `[link text](url)`
     - Use `>` for blockquotes and sidebars.
-    - Use triple backticks (```) for code blocks or preformatted text.
-        - If you detect that the code or snippet is from a particular programming language, specify it after the first set of backticks, e.g., ```python or ```json.
+    - Use triple backticks (```) for code blocks or preformatted text. 
+        - If you know the language (e.g. JSON, Python), specify it right after the opening backticks:
 
 2. **Multi-Column Layouts:**
     - If the PDF page is presented in multiple columns, read the text in a logical order (e.g., top to bottom of the left column, then top to bottom of the next column, and so forth).
@@ -30,10 +28,17 @@ Your task is to accurately convert the content of a single PDF page into properl
     - Enclose all mathematical content in `$$...$$`.
     - Example: `$$E = mc^2$$`
 
-4. **Images and Visuals:** The resulting markdown will be processed by a large language model that does not interpret images. Therefore, you should provide detailed descriptions of any images or visual content in the PDF and do NOT embed images using `![image](url)`.
+4. **Tables**
+    - If the PDF contains tables—whether originally text-based or extracted from images—convert them into Markdown tables.
+
+5. **Images and Visuals:** The resulting markdown will be processed by a large language model that does not interpret images. Therefore, you should provide detailed descriptions of any images or visual content in the PDF and do NOT embed images using `![image](url)`.
     - Provide a **detailed blockquoted description** of each image or figure:
        > **Image Description**: Then follow with a comprehensive textual explanation, including the image's purpose, layout, labels, colors, and any relevant details.
     - For complex visuals, use additional lists or paragraphs within the blockquote to clarify content.
+    - If the image is simply a textual table (or similar) that you've already transcribed into Markdown, do not add a duplicate image description.
+
+6. **Previous Page Context**
+    - If you have Markdown from previous pages, ensure your text flows consistently. Avoid duplicating content that was already captured.
 
 **Your response must follow these rules and contain only the converted Markdown content.**
     """
