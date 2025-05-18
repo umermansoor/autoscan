@@ -1,8 +1,11 @@
+import logging
 import aiohttp
-import aiofiles # type: ignore
+import aiofiles  # type: ignore
 from typing import Optional
 from pathlib import Path
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 async def get_or_download_file(file_path: str, destination_dir: str) -> Optional[str]:
     """
@@ -22,6 +25,7 @@ async def get_or_download_file(file_path: str, destination_dir: str) -> Optional
 
         # Handle URLs
         if parsed.scheme in ("http", "https"):
+            logger.debug(f"Downloading file from URL: {file_path}")
             filename = Path(parsed.path).name or "downloaded_file"
             local_path = Path(destination_dir) / filename
 
@@ -32,18 +36,25 @@ async def get_or_download_file(file_path: str, destination_dir: str) -> Optional
             async with aiohttp.ClientSession() as session:
                 async with session.get(file_path) as response:
                     if response.status != 200:
+                        logger.error(
+                            f"Failed to download {file_path}: status {response.status}"
+                        )
                         return None
                     async with aiofiles.open(local_path, mode="wb") as f:
                         await f.write(await response.read())
+            logger.debug(f"File downloaded to {local_path}")
             return str(local_path)
 
         # Handle local file paths
         local_path = Path(file_path).resolve()
         if not local_path.exists():
+            logger.error(f"File not found: {file_path}")
             return None
+        logger.debug(f"Using local file {local_path}")
         return str(local_path)
 
-    except Exception:
+    except Exception as e:
+        logger.exception(f"Failed to handle file {file_path}: {e}")
         return None
 
 
@@ -60,6 +71,7 @@ async def write_text_to_file(filename: str, output_dir: str, text:str) -> Option
     """
 
     if not filename or not output_dir:
+        logger.error("Filename or output directory not provided")
         return None
     
     output_path = Path(output_dir) / filename
@@ -67,5 +79,6 @@ async def write_text_to_file(filename: str, output_dir: str, text:str) -> Option
 
     async with aiofiles.open(output_path, mode="w", encoding="utf-8") as f:
         await f.write(text)
+    logger.debug(f"Wrote text to {output_path}")
 
     return str(output_path)

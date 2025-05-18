@@ -172,6 +172,7 @@ async def _process_images_async(
 
     async def process_single_image(image_path: str, previous_page_markdown: Optional[str] = None):
         async with context:
+            logger.debug(f"Processing image {image_path}")
             try:
                 return await model.image_to_markdown(
                     image_path,
@@ -179,6 +180,7 @@ async def _process_images_async(
                     previous_page_markdown=previous_page_markdown,
                 )
             except Exception as e:
+                logger.exception(f"Error processing image {image_path}: {e}")
                 raise LLMProcessingError(
                     f"Error processing image '{image_path}': {e}"
                 ) from e
@@ -199,6 +201,14 @@ async def _process_images_async(
     total_prompt_tokens = sum(r.prompt_tokens for r in valid_results)
     total_completion_tokens = sum(r.completion_tokens for r in valid_results)
     total_cost = sum(r.cost for r in valid_results)
+
+    logger.debug(
+        "Processed %s images: prompt_tokens=%s completion_tokens=%s cost=%s",
+        len(pdf_page_images),
+        total_prompt_tokens,
+        total_completion_tokens,
+        total_cost,
+    )
 
     return aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost
           
