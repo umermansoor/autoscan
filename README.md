@@ -57,7 +57,7 @@ Depending on the model provider you choose, set the appropriate environment vari
 
 - **OpenAI**: `OPENAI_API_KEY`
 - **Anthropic (Claude)**: `ANTHROPIC_API_KEY`
-- **Google Gemini**: `GOOGLE_API_KEY`
+- **Google Gemini**: `GOOGLE_API_KEY` or `GEMINI_API_KEY` if using Google AI Studio (e.g.   `gemini/gemini-2.0-flash`)
 
 **macOS/Linux example**:
 
@@ -84,14 +84,14 @@ autoscan path/to/your/file.pdf
 autoscan --accuracy high path/to/your/file.pdf
 
 # Specify a model (default is `openai/gpt-4o`):
-autoscan --model anthropic/claude-3-sonnet-20240229 path/to/your/file.pdf
+autoscan --model gemini/gemini-2.0-flash path/to/your/file.pdf
 ```
 
-### **Accuracy Levels**
+### Accuracy Levels
 
 `low`, `medium`, and `high` are supported. Higher accuracy processes pages sequentially and performs an additional review step, which increases token usage (cost) and runtime.
 
-### **Programmatic Example**
+### Programmatic Example
 
 You can also invoke AutoScan in your Python code:
 
@@ -113,7 +113,7 @@ asyncio.run(main())
 2. **Process Images with LLM**: The images are processed by the LLM to generate Markdown.
 3. **Aggregate Markdown**: All Markdown output is combined into one file (on `accuracy==low` markdowns are combined together using a simple algorithm; on `accuracy==medium,high` an LLM is used to combine all outputs together)
 
-## **Configuration**
+## Configuration
 
 Configure models and other parameters using the `autoscan` function signature:
 

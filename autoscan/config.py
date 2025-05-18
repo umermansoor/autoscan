@@ -1,4 +1,5 @@
-from typing import Tuple
+from typing import Dict
+from litellm import model_cost, get_max_tokens, cost_per_token
 
 class PDF2ImageConversionConfig:
     NUM_THREADS = 4
@@ -7,42 +8,47 @@ class PDF2ImageConversionConfig:
     USE_PDFTOCAIRO = True
     SIZE = (None, 1535)
 
-
 class LLMConfig:
     DEFAULT_MODEL = "openai/gpt-4o"
-    MODEL_PROPERTIES = {
-        "openai/gpt-4o": {
-            "max_output_tokens": 16384,
-            "max_input_tokens": 128000,
-            "input_costs_per_1k_tokens": 0.00250,
-            "completion_per_1k_tokens": 0.01000
-        }
-    }
 
     @classmethod
     def get_costs_for_model(cls, model: str, input_tokens: int, completion_tokens: int) -> float:
-        model_properties = cls.MODEL_PROPERTIES.get(model)
-        if not model_properties:
-            raise ValueError(f"Model '{model}' not found in model properties.")
+        """
+        Calculate the total cost for a given model based on input and completion tokens.
+        """
+        try:
+            prompt_cost, completion_cost = cost_per_token(
+                model=model,
+                prompt_tokens=input_tokens,
+                completion_tokens=completion_tokens
+            )
+            return prompt_cost + completion_cost
+        except Exception as e:
+            raise ValueError(f"Error retrieving cost for model '{model}': {e}")
 
-        input_costs = (input_tokens / 1000) * model_properties["input_costs_per_1k_tokens"]
-        completion_costs = (completion_tokens / 1000) * model_properties["completion_per_1k_tokens"]
-
-        return input_costs + completion_costs
-    
     @classmethod
-    def get_max_tokens_for_model(cls, model: str) -> dict:
-        model_properties = cls.MODEL_PROPERTIES.get(model)
-        if not model_properties:
-            raise ValueError(f"Model '{model}' not found in model properties.")
+    def get_max_tokens_for_model(cls, model: str) -> Dict[str, int]:
+        """
+        Retrieve the maximum input and output tokens allowed for the specified model.
+        """
+        try:
+            # Fetch the model cost details which includes max_tokens
+            model_info = model_cost.get(model)
+            if not model_info:
+                raise ValueError(f"Model '{model}' not found in model cost data.")
 
-        return {
-            "input_tokens": int(model_properties["max_input_tokens"]),
-            "output_tokens": int(model_properties["max_output_tokens"])
-    }
+            max_input_tokens = model_info.get("max_input_tokens")
+            max_output_tokens = model_info.get("max_output_tokens")
 
-    
+            if max_input_tokens is None or max_output_tokens is None:
+                # Fallback to get_max_tokens if specific values are not available
+                max_tokens = get_max_tokens(model)
+                # Assuming equal split if specific input/output limits are not provided
+                max_input_tokens = max_output_tokens = max_tokens // 2
 
-
-
-
+            return {
+                "input_tokens": int(max_input_tokens),
+                "output_tokens": int(max_output_tokens)
+            }
+        except Exception as e:
+            raise ValueError(f"Error retrieving max tokens for model '{model}': {e}")

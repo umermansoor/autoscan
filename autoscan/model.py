@@ -10,6 +10,7 @@ from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRI
 from .config import LLMConfig
 from .utils.env import ensure_env_for_model
 import tiktoken
+from .errors import LLMProcessingError
 
 class LlmModel:
     """
@@ -90,7 +91,7 @@ class LlmModel:
         if previous_page_markdown:
             user_content.append({
                 "type": "text",
-                "text": f"Here are the last 50 characters in Markdown format from the previous page to provide you context. "
+                "text": f"Here are the last few characters in Markdown format from the previous page to provide you context. "
                         f"The final output has no page breaks."
                         f"\n<!-- PAGE SEPARATOR -->\n{previous_page_markdown[-100:]}"
             })
@@ -142,8 +143,10 @@ class LlmModel:
                 completion_tokens=usage.completion_tokens,
                 cost=total_cost
             )
-        except Exception as err:
-            raise RuntimeError("Error: Image to markdown LLM call failed") from err
+        except Exception as err: 
+            raise LLMProcessingError(
+                f"Image to markdown LLM call failed: {err}"
+            ) from err
 
 
     async def postprocess_markdown(self, markdowns: List[str]) -> ModelResult:
@@ -196,7 +199,9 @@ class LlmModel:
             )
 
         except Exception as err:
-            raise RuntimeError("Error: Post-process LLM call failed.") from err
+            raise LLMProcessingError(
+                f"Post-process LLM call failed: {err}"
+            ) from err
   
     
     def _calculate_tokens(self, model_name: str, content: str) -> int:
