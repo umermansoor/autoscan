@@ -12,13 +12,8 @@ async def _process_file(pdf_path: str, accuracy: str, debug: bool = False) -> No
     logging.info(f"Processing file: {pdf_path}")
     await autoscan(pdf_path=pdf_path, accuracy=accuracy, debug=debug)
 
-async def _run(pdf_path: str | None = None, directory: str | None = None, accuracy: str = "medium", debug: bool = False) -> None:
-    if directory:
-        logging.info(f"Processing all PDF files in directory: {directory}")
-        for file_name in os.listdir(directory):
-            if file_name.lower().endswith(".pdf"):
-                await _process_file(os.path.join(directory, file_name), accuracy, debug)
-    elif pdf_path:
+async def _run(pdf_path: str | None = None, accuracy: str = "medium", debug: bool = False) -> None:
+    if pdf_path:
         await _process_file(pdf_path, accuracy, debug)
     else:
         logging.error("No valid input provided. Use --help for usage information.")
@@ -26,7 +21,7 @@ async def _run(pdf_path: str | None = None, directory: str | None = None, accura
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run autoscan on a PDF file or all PDF files in a directory."
+        description="Run autoscan on a PDF file"
     )
     parser.add_argument("pdf_path", nargs="?", help="Path to a single PDF file")
 
@@ -61,7 +56,6 @@ def main() -> None:
     asyncio.run(
         _run(
             pdf_path=args.pdf_path,
-            directory=args.directory,
             accuracy=args.accuracy,
             debug=args.debug,
         )

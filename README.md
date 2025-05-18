@@ -98,7 +98,7 @@ asyncio.run(main())
 
 1. **Convert PDF to Images**: Each page of the PDF is converted into an image.
 2. **Process Images with LLM**: The images are processed by the LLM to generate Markdown.
-3. **Aggregate Markdown**: All Markdown output is combined into one file (on `accuracy==low` markdowns are combined together using a simple algorithm; on `accuracy==medium,high` an LLM is used to combined all outputs together)
+3. **Aggregate Markdown**: All Markdown output is combined into one file (on `accuracy==low` markdowns are combined together using a simple algorithm; on `accuracy==medium,high` an LLM is used to combine all outputs together)
 
 ## **Configuration**
 
