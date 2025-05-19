@@ -23,7 +23,6 @@ async def autoscan(
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
-    debug: bool = False,
 ) -> AutoScanOutput:
     """
     Convert a PDF to markdown by:
@@ -40,7 +39,6 @@ async def autoscan(
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
     - `cleanup_temp` (bool, optional): If `True`, cleans up temporary, intermediate files upon completion. Defaults to `True`.
     - `concurrency` (int, optional): Maximum number of concurrent model calls. Defaults to 10.
-    - `debug` (bool, optional): Enable litellm debug logging. Defaults to `False`.
 
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
@@ -72,7 +70,7 @@ async def autoscan(
         logger.info(f"Generated {len(images)} page images from PDF.")
 
         # Initialize the LLM
-        model = LlmModel(model_name=model_name, debug=debug, accuracy=accuracy)
+        model = LlmModel(model_name=model_name, accuracy=accuracy)
         logger.info(f"Initialized model: {model_name}")
 
         # Process images

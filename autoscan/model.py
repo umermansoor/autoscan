@@ -23,9 +23,8 @@ class LlmModel:
     """
 
     def __init__(
-        self, 
-        model_name: str = "openai/gpt-4o", 
-        debug: bool = False, 
+        self,
+        model_name: str = "openai/gpt-4o",
         accuracy: str = "medium"
     ):
         """
@@ -33,11 +32,9 @@ class LlmModel:
 
         Args:
             model_name (str): The model name to use. Defaults to "openai/gpt-4o".
-            debug (bool): If True, log LLM prompts and responses at DEBUG level.
             accuracy (str): An accuracy level descriptor. Defaults to "medium".
         """
         self._model_name = model_name
-        self._debug = debug
         self._accuracy = accuracy
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         ensure_env_for_model(model_name)
@@ -87,12 +84,12 @@ class LlmModel:
 
     def _maybe_log_debug_messages(self, messages: List[Dict[str, Any]]) -> None:
         """
-        Log messages at DEBUG level if self._debug is True, otherwise do nothing.
+        Log messages at DEBUG level if the logger is configured accordingly.
 
         Args:
             messages (List[Dict[str, Any]]): The messages to log.
         """
-        if not self._debug:
+        if not logger.isEnabledFor(logging.DEBUG):
             return
 
         for msg in messages:
@@ -223,7 +220,7 @@ class LlmModel:
             {"role": "user", "content": user_content}
         ]
 
-        # Log messages if debug is enabled
+        # Log messages if DEBUG level is enabled
         self._maybe_log_debug_messages(messages)
 
         try:
@@ -239,7 +236,7 @@ class LlmModel:
             usage = response.usage
             total_cost = self._calculate_cost(usage)
 
-            # Log the assistant's response if debug is enabled
+            # Log the assistant's response if DEBUG level is enabled
             self._maybe_log_debug_messages([
                 {"role": "assistant", "content": content}
             ])
@@ -289,7 +286,7 @@ class LlmModel:
             {"role": "user", "content": user_content}
         ]
 
-        # Log messages if debug is enabled
+        # Log messages if DEBUG level is enabled
         self._maybe_log_debug_messages(messages)
 
         try:
@@ -301,7 +298,7 @@ class LlmModel:
             raw_content = response.choices[0].message.content.strip()
             content = self._strip_code_fences(raw_content)
 
-            # Log the final content if debug is enabled
+            # Log the final content if DEBUG level is enabled
             self._maybe_log_debug_messages([
                 {"role": "assistant", "content": content}
             ])
