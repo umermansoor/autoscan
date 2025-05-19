@@ -78,6 +78,28 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
+    def _log_debug_messages(self, messages: List[Dict[str, Any]]) -> None:
+        """Log messages for debugging using INFO level."""
+        for msg in messages:
+            role = msg.get("role", "unknown").capitalize()
+            logger.info("%s:", role)
+            content = msg.get("content")
+            if isinstance(content, list):
+                for item in content:
+                    if item.get("type") == "text":
+                        logger.info(item.get("text"))
+                    elif item.get("type") == "image_url":
+                        url = item.get("image_url", {}).get("url", "")
+                        if url.startswith("data:image"):
+                            base64_str = url.split(",", 1)[1]
+                            preview = f"{base64_str[:100]}...{base64_str[-10:]}"
+                            logger.info("[IMAGE BASE64] %s", preview)
+                        else:
+                            logger.info("[IMAGE URL] %s", url)
+            else:
+                logger.info(content)
+
+
     async def image_to_markdown(
             self,
             image_path: str,
@@ -129,10 +151,7 @@ class LlmModel:
         ]
 
         if self._debug:
-            logger.debug(f"System prompt: {system_prompt}")
-            for item in user_content:
-                if item["type"] == "text":
-                    logger.debug(f"User content: {item['text']}")
+            self._log_debug_messages(messages)
 
         try:
             response = await acompletion(
@@ -141,18 +160,31 @@ class LlmModel:
             )
             content = self._strip_code_fences(response.choices[0].message.content.strip())
             usage = response.usage  # Extract token usage
+
+            if self._debug:
+                self._log_debug_messages([
+                    {"role": "assistant", "content": content}
+                ])
     
             try:
                 total_cost = LLMConfig.get_costs_for_model(self._model_name, usage.prompt_tokens, usage.completion_tokens)
             except ValueError as e:
                 logger.error(f"Cost calculation failed: {e}")
                 total_cost = 0.0
-            logger.debug(
-                "Tokens prompt=%s completion=%s cost=%s",
-                usage.prompt_tokens,
-                usage.completion_tokens,
-                total_cost,
-            )
+            if self._debug:
+                logger.info(
+                    "Tokens prompt=%s completion=%s cost=%s",
+                    usage.prompt_tokens,
+                    usage.completion_tokens,
+                    total_cost,
+                )
+            else:
+                logger.debug(
+                    "Tokens prompt=%s completion=%s cost=%s",
+                    usage.prompt_tokens,
+                    usage.completion_tokens,
+                    total_cost,
+                )
 
             # Extract required information and return a CompletionResult
             return ModelResult(
@@ -185,8 +217,7 @@ class LlmModel:
         ]
 
         if self._debug:
-            logger.debug(f"System prompt: {FINAL_REVIEW_PROMPT}")
-            logger.debug(f"User content: {user_content}")
+            self._log_debug_messages(messages)
 
         try:
             response = await acompletion(
@@ -195,17 +226,30 @@ class LlmModel:
             )
             content = self._strip_code_fences(response.choices[0].message.content.strip())
 
+            if self._debug:
+                self._log_debug_messages([
+                    {"role": "assistant", "content": content}
+                ])
+
             try:
                 total_cost = LLMConfig.get_costs_for_model(self._model_name, response.usage.prompt_tokens, response.usage.completion_tokens)
             except ValueError as e:
                 logger.error(f"Cost calculation failed: {e}")
                 total_cost = 0.0
-            logger.debug(
-                "Tokens prompt=%s completion=%s cost=%s",
-                response.usage.prompt_tokens,
-                response.usage.completion_tokens,
-                total_cost,
-            )
+            if self._debug:
+                logger.info(
+                    "Tokens prompt=%s completion=%s cost=%s",
+                    response.usage.prompt_tokens,
+                    response.usage.completion_tokens,
+                    total_cost,
+                )
+            else:
+                logger.debug(
+                    "Tokens prompt=%s completion=%s cost=%s",
+                    response.usage.prompt_tokens,
+                    response.usage.completion_tokens,
+                    total_cost,
+                )
 
             return ModelResult(
                 content=content,
