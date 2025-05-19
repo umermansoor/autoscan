@@ -92,25 +92,39 @@ class LlmModel:
         if not logger.isEnabledFor(logging.DEBUG):
             return
 
+        output_file_path = os.path.join(os.getcwd(), "output", "output.txt")
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+
         for msg in messages:
             role = msg.get("role", "unknown").capitalize()
             content = msg.get("content")
-            logger.debug("%s:", role)
+            log_message = f"{role}:"
+
             # The content can be a string or a list of content items.
             if isinstance(content, list):
                 for item in content:
                     if item.get("type") == "text":
-                        logger.debug(item.get("text"))
+                        text = item.get("text")
+                        log_message += f"\n{text}"
                     elif item.get("type") == "image_url":
                         url = item.get("image_url", {}).get("url", "")
                         if url.startswith("data:image"):
                             base64_str = url.split(",", 1)[1]
                             preview = f"{base64_str[:100]}...{base64_str[-10:]}"
-                            logger.debug("[IMAGE BASE64] %s", preview)
+                            log_message += f"\n[IMAGE BASE64] {preview}"
                         else:
-                            logger.debug("[IMAGE URL] %s", url)
+                            log_message += f"\n[IMAGE URL] {url}"
             else:
-                logger.debug(content)
+                log_message += f"\n{content}"
+
+            logger.debug(log_message)
+
+            try:
+                with open(output_file_path, "a") as output_file:
+                    output_file.write(f"\n\n<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>\n\n")
+                    output_file.write(log_message + "\n")
+            except Exception as e:
+                logger.error(f"Failed to write to file: {e}")
 
     def _calculate_cost(self, usage) -> float:
         """
