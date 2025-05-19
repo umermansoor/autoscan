@@ -82,8 +82,9 @@ def main() -> None:
         parser.print_help()
         return
 
-    logging.getLogger().setLevel(getattr(logging, args.log_level))
+    args = parser.parse_args()
 
+    logging.basicConfig(level=getattr(logging, args.log_level), format="%(asctime)s - %(levelname)s - %(message)s")
     asyncio.run(
         _run(
             pdf_path=args.pdf_path,
