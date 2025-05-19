@@ -10,6 +10,7 @@ When perfect accuracy is not essential, faster and cheaper alternatives (e.g. [P
 - **Image transcription** so visuals are described in text rather than embedded.
 - **Handwriting OCR** when handwritten notes are present.
 - **Multi-language** support.
+- **Optional user instructions** passed directly to the LLM for custom behavior.
 - **Works with any LLM** via [LiteLLM](https://github.com/BerriAI/litellm).
 
 ![Example 1](assets/pdf_to_md_eg_1.png)
@@ -85,6 +86,9 @@ autoscan --accuracy high path/to/your/file.pdf
 
 # Specify a model (default is `openai/gpt-4o`):
 autoscan --model gemini/gemini-2.0-flash path/to/your/file.pdf
+
+# Provide additional instructions for the LLM:
+autoscan --instructions "This is an invoice; use GitHub tables" path/to/your/file.pdf
 ```
 
 ### Accuracy Levels
@@ -122,7 +126,7 @@ async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
     accuracy: str = "medium",
-    transcribe_images: Optional[bool] = True,
+    user_instructions: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,

@@ -18,7 +18,7 @@ async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
     accuracy: str = "medium",
-    transcribe_images: bool = True,
+    user_instructions: Optional[str] = None,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
@@ -35,7 +35,7 @@ async def autoscan(
     - `pdf_path` (str): **Required.** Path to the input PDF file.
     - `model_name` (str, optional): Name of the AI model to process image-to-text conversion. Defaults to `"openai/gpt-4o"`.
     - `accuracy` (str, optional): One of `low`, `medium`, or `high` determining processing strategy. Defaults to `"medium"`.
-    - `transcribe_images` (bool, optional): Whether to process images for transcription. Defaults to `True`.
+    - `user_instructions` (str, optional): Additional context or instructions passed directly to the LLM.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the current directory's "output" subfolder if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
     - `cleanup_temp` (bool, optional): If `True`, cleans up temporary, intermediate files upon completion. Defaults to `True`.
@@ -82,15 +82,17 @@ async def autoscan(
         sequential = accuracy == "high"
         do_postprocess = accuracy in {"medium", "high"}
 
-        (aggregated_markdown,
-         total_prompt_tokens,
-         total_completion_tokens,
-         total_cost) = await _process_images_async(
+        (
+            aggregated_markdown,
+            total_prompt_tokens,
+            total_completion_tokens,
+            total_cost,
+        ) = await _process_images_async(
             images,
             model,
-            transcribe_images,
             concurrency=concurrency,
             sequential=sequential,
+            user_instructions=user_instructions,
         )
 
         if do_postprocess:
@@ -154,9 +156,9 @@ async def _postprocess_markdown(markdown: List[str], model: LlmModel) -> str:
 async def _process_images_async(
     pdf_page_images: List[str],
     model: LlmModel,
-    transcribe_images: bool,
     concurrency: Optional[int] = 10,
     sequential: bool = False,
+    user_instructions: Optional[str] = None,
 ) -> Tuple[List[str], int, int, float]:
     """
     Process each image using the given model to extract text.
@@ -176,8 +178,8 @@ async def _process_images_async(
             try:
                 return await model.image_to_markdown(
                     image_path,
-                    transcribe_images=transcribe_images,
                     previous_page_markdown=previous_page_markdown,
+                    user_instructions=user_instructions,
                 )
             except Exception as e:
                 logger.exception(f"Error processing image {image_path}: {e}")

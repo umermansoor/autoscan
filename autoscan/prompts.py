@@ -1,12 +1,5 @@
-DEFAULT_SYSTEM_PROMPT = (
-    "Convert the following PDF page to Markdown. "
-    "Include all text, tables, lists, and images. "
-    "Use proper Markdown syntax for lists and tables, and embed images with meaningful alt text. "
-    "Return plain Markdown only - do not wrap the output in code fences or add explanations."
-)
-
-DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION = """
-Your task is to accurately convert the content of a single PDF page into properly structured Markdown format.  The conversion must include all textual elements, as well as tables and image descriptions. Do not provide any explanation or commentary outside of the Markdown output. 
+DEFAULT_SYSTEM_PROMPT = """
+Your task is to accurately convert the content of a single PDF page into properly structured Markdown format.  The conversion must include all textual elements, as well as tables and image descriptions. Do not provide any explanation or commentary outside of the Markdown output.
 
 ## Instructions
 

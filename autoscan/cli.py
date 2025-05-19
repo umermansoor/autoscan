@@ -9,13 +9,31 @@ from .utils.env import get_env_var_for_model
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-async def _process_file(pdf_path: str, model: str, accuracy: str, debug: bool = False) -> None:
+async def _process_file(
+    pdf_path: str,
+    model: str,
+    accuracy: str,
+    instructions: str | None = None,
+    debug: bool = False,
+) -> None:
     logging.info(f"Processing file: {pdf_path}")
-    await autoscan(pdf_path=pdf_path, model_name=model, accuracy=accuracy, debug=debug)
+    await autoscan(
+        pdf_path=pdf_path,
+        model_name=model,
+        accuracy=accuracy,
+        user_instructions=instructions,
+        debug=debug,
+    )
 
-async def _run(pdf_path: str | None = None, model: str = "openai/gpt-4o", accuracy: str = "medium", debug: bool = False) -> None:
+async def _run(
+    pdf_path: str | None = None,
+    model: str = "openai/gpt-4o",
+    accuracy: str = "medium",
+    instructions: str | None = None,
+    debug: bool = False,
+) -> None:
     if pdf_path:
-        await _process_file(pdf_path, model, accuracy, debug)
+        await _process_file(pdf_path, model, accuracy, instructions, debug)
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -38,6 +56,11 @@ def main() -> None:
         type=str,
         default="openai/gpt-4o",
         help="Model name to use with LiteLLM",
+    )
+    parser.add_argument(
+        "--instructions",
+        type=str,
+        help="Optional instructions passed to the LLM",
     )
     parser.add_argument(
         "--debug",
@@ -65,6 +88,7 @@ def main() -> None:
             pdf_path=args.pdf_path,
             model=args.model,
             accuracy=args.accuracy,
+            instructions=args.instructions,
             debug=args.debug,
         )
     )
