@@ -78,6 +78,28 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
+    def _print_debug_messages(self, messages: List[Dict[str, Any]]) -> None:
+        """Pretty print messages for debugging."""
+        for msg in messages:
+            role = msg.get("role", "unknown").capitalize()
+            print(f"{role}:")
+            content = msg.get("content")
+            if isinstance(content, list):
+                for item in content:
+                    if item.get("type") == "text":
+                        print(item.get("text"))
+                    elif item.get("type") == "image_url":
+                        url = item.get("image_url", {}).get("url", "")
+                        if url.startswith("data:image"):
+                            base64_str = url.split(",", 1)[1]
+                            preview = f"{base64_str[:100]}...{base64_str[-10:]}"
+                            print(f"[IMAGE BASE64] {preview}")
+                        else:
+                            print(f"[IMAGE URL] {url}")
+            else:
+                print(content)
+
+
     async def image_to_markdown(
             self,
             image_path: str,
@@ -129,10 +151,8 @@ class LlmModel:
         ]
 
         if self._debug:
-            logger.debug(f"System prompt: {system_prompt}")
-            for item in user_content:
-                if item["type"] == "text":
-                    logger.debug(f"User content: {item['text']}")
+            print("=== LLM Call: image_to_markdown ===")
+            self._print_debug_messages(messages)
 
         try:
             response = await acompletion(
@@ -141,6 +161,11 @@ class LlmModel:
             )
             content = self._strip_code_fences(response.choices[0].message.content.strip())
             usage = response.usage  # Extract token usage
+
+            if self._debug:
+                print("Response:")
+                print(content)
+                print("=== End LLM Call ===")
     
             try:
                 total_cost = LLMConfig.get_costs_for_model(self._model_name, usage.prompt_tokens, usage.completion_tokens)
@@ -185,8 +210,8 @@ class LlmModel:
         ]
 
         if self._debug:
-            logger.debug(f"System prompt: {FINAL_REVIEW_PROMPT}")
-            logger.debug(f"User content: {user_content}")
+            print("=== LLM Call: postprocess_markdown ===")
+            self._print_debug_messages(messages)
 
         try:
             response = await acompletion(
@@ -194,6 +219,11 @@ class LlmModel:
                 messages=messages,
             )
             content = self._strip_code_fences(response.choices[0].message.content.strip())
+
+            if self._debug:
+                print("Response:")
+                print(content)
+                print("=== End LLM Call ===")
 
             try:
                 total_cost = LLMConfig.get_costs_for_model(self._model_name, response.usage.prompt_tokens, response.usage.completion_tokens)
