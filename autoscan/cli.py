@@ -14,7 +14,6 @@ async def _process_file(
     model: str,
     accuracy: str,
     instructions: str | None = None,
-    debug: bool = False,
 ) -> None:
     logging.info(f"Processing file: {pdf_path}")
     await autoscan(
@@ -22,7 +21,6 @@ async def _process_file(
         model_name=model,
         accuracy=accuracy,
         user_instructions=instructions,
-        debug=debug,
     )
 
 async def _run(
@@ -30,10 +28,9 @@ async def _run(
     model: str = "openai/gpt-4o",
     accuracy: str = "medium",
     instructions: str | None = None,
-    debug: bool = False,
 ) -> None:
     if pdf_path:
-        await _process_file(pdf_path, model, accuracy, instructions, debug)
+        await _process_file(pdf_path, model, accuracy, instructions)
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -63,9 +60,11 @@ def main() -> None:
         help="Optional instructions passed to the LLM",
     )
     parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable litellm debug logging",
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Set the logging level",
     )
 
     args = parser.parse_args()
@@ -83,13 +82,15 @@ def main() -> None:
         parser.print_help()
         return
 
+    args = parser.parse_args()
+
+    logging.basicConfig(level=getattr(logging, args.log_level), format="%(asctime)s - %(levelname)s - %(message)s")
     asyncio.run(
         _run(
             pdf_path=args.pdf_path,
             model=args.model,
             accuracy=args.accuracy,
             instructions=args.instructions,
-            debug=args.debug,
         )
     )
 

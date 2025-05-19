@@ -8,16 +8,14 @@ from autoscan.utils.env import get_env_var_for_model
 async def test_process_file_passes_accuracy():
     called = {}
 
-    async def fake_autoscan(pdf_path, model_name="openai/gpt-4o", accuracy="medium", debug=False):
+    async def fake_autoscan(pdf_path, model_name="openai/gpt-4o", accuracy="medium", user_instructions=None):
         called['accuracy'] = accuracy
-        called['debug'] = debug
         called['model'] = model_name
 
     with patch('autoscan.cli.autoscan', new=fake_autoscan):
         await cli._process_file('sample.pdf', 'openai/gpt-4o', 'high')
 
     assert called.get('accuracy') == 'high'
-    assert called.get('debug') is False
     assert called.get('model') == 'openai/gpt-4o'
 
 
