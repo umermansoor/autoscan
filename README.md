@@ -1,6 +1,6 @@
 # AutoScan
 
-AutoScan converts PDF files into Markdown using LLMs (e.g., GPT or Gemini). It is designed for smaller yet complex documents that require high fidelity—for example, medical documents, invoices, or other official forms. The resulting Markdown can then be fed into another LLM for downstream processing. 
+AutoScan converts PDF files into Markdown using LLMs (e.g. GPT or Gemini). It is designed for smaller yet complex documents that require high fidelity—for example, medical documents, invoices, or other official forms. The resulting Markdown can then be fed into another LLM for downstream processing. 
 
 When perfect accuracy is not essential, faster and cheaper alternatives (e.g. [PyMuPDF4LLM](https://pymupdf.readthedocs.io/en/latest/pymupdf4llm/)) may be more suitable. Using higher accuracy modes in AutoScan will take more time and use more tokens (increasing cost).
 
@@ -105,7 +105,7 @@ from autoscan.autoscan import autoscan
 
 async def main():
     pdf_path = "path/to/your/pdf_file.pdf"
-    output = await autoscan(pdf_path, debug=True)
+    output = await autoscan(pdf_path)
     print(output.markdown)
 
 asyncio.run(main())
@@ -130,11 +130,8 @@ async def autoscan(
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
-    debug: bool = False,
 ) -> AutoScanOutput:
 ```
-
-Set `debug=True` to print the exact prompts sent to the LLM.
 
 ## Output
 
@@ -150,6 +147,12 @@ The `autoscan` function returns an object with the following attributes:
 ## Examples
 
 Sample PDFs are available in the `examples` directory for testing and demonstration.
+
+E.g. 
+
+```sh
+autoscan --accuracy high --model gemini/gemini-2.0-flash --log-level DEBUG ./examples/table.pdf
+```
 
 ## Testing
 

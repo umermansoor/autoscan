@@ -7,8 +7,6 @@ import sys
 from .autoscan import autoscan
 from .utils.env import get_env_var_for_model
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 async def _process_file(
     pdf_path: str,
     model: str,
@@ -81,8 +79,6 @@ def main() -> None:
     if not args.pdf_path:
         parser.print_help()
         return
-
-    args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level), format="%(asctime)s - %(levelname)s - %(message)s")
     asyncio.run(
