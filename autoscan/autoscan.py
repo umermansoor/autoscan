@@ -98,7 +98,7 @@ async def autoscan(
         if do_postprocess:
             markdown_content = await _postprocess_markdown(aggregated_markdown, model)
         else:
-            markdown_content = "\n\n".join(aggregated_markdown).replace("---PAGE BREAK---", "")
+            markdown_content = "\n".join(aggregated_markdown).replace("---PAGE BREAK---", "")
 
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
