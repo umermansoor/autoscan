@@ -115,7 +115,7 @@ async def autoscan(
                 f"  Output file      : {output_filename}",
                 f"  Completion time  : {completion_time:.2f} seconds",
                 f"  Tokens (in/out)  : {total_prompt_tokens}/{total_completion_tokens}",
-                f"  Cost             : ${total_cost:.2f}",
+                f"  Cost             : ${total_cost:.3f}",
                 f"  Accuracy         : {accuracy}",
             ]
         )
