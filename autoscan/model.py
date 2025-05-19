@@ -7,7 +7,7 @@ from litellm import acompletion
 
 from .image_processing import image_to_base64
 from .types import ModelResult
-from .prompts import DEFAULT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION, FINAL_REVIEW_PROMPT
+from .prompts import DEFAULT_SYSTEM_PROMPT, FINAL_REVIEW_PROMPT
 from .config import LLMConfig
 from .utils.env import ensure_env_for_model
 import tiktoken
@@ -33,7 +33,6 @@ class LlmModel:
         self._debug = debug
         self._accuracy = accuracy
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
-        self._system_prompt_image_transcription = DEFAULT_SYSTEM_PROMPT_IMAGE_TRANSCRIPTION
         ensure_env_for_model(model_name)
 
         if self._debug and hasattr(litellm, "set_verbose"):
@@ -82,16 +81,16 @@ class LlmModel:
     async def image_to_markdown(
             self,
             image_path: str,
-            transcribe_images=False,
             previous_page_markdown: Optional[str] = None,
+            user_instructions: Optional[str] = None,
     ) -> ModelResult:
         """
         Generate a markdown representation of a PDF page from an image.
 
         Args:
             image_path (str): Path to the image file of the PDF page.
-            transcribe_images: Describes images in words within the markdown.
             previous_page_markdown: Optional markdown of previous page in PDF file
+            user_instructions: Additional instructions provided by the user
         Returns:
             ModelCompletionResult: The generated markdown and token usage details.
         """
@@ -113,12 +112,16 @@ class LlmModel:
         if previous_page_markdown:
             user_content.append({
                 "type": "text",
-                "text": f"Here are the last few characters in Markdown format from the previous page to provide you context. "
-                        f"The final output has no page breaks."
-                        f"\n<!-- PAGE SEPARATOR -->\n{previous_page_markdown[-100:]}"
+                "text": (
+                    "Here are the last few characters in Markdown format from the previous page to provide you context. "
+                    "The final output has no page breaks."
+                    f"\n<!-- PAGE SEPARATOR -->\n{previous_page_markdown[-100:]}"
+                ),
             })
+        if user_instructions:
+            user_content.append({"type": "text", "text": user_instructions})
 
-        system_prompt = self._system_prompt_image_transcription if transcribe_images else self._system_prompt
+        system_prompt = self._system_prompt
 
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
