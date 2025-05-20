@@ -7,7 +7,7 @@ from litellm import acompletion
 
 from .image_processing import image_to_base64
 from .types import ModelResult
-from .prompts import DEFAULT_SYSTEM_PROMPT, FINAL_REVIEW_PROMPT
+from .prompts import DEFAULT_SYSTEM_PROMPT
 from .config import LLMConfig
 from .utils.env import ensure_env_for_model
 import tiktoken
@@ -167,6 +167,15 @@ class LlmModel:
         logger.debug("Calculated %s tokens for model %s", token_count, model_name)
         return token_count
 
+    def _last_tokens_text(self, content: str, n: int) -> str:
+        """Return the text of the last ``n`` tokens from ``content``."""
+        try:
+            encoding = tiktoken.encoding_for_model(self._model_name)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+        tokens = encoding.encode(content)
+        return encoding.decode(tokens[-n:])
+
     async def image_to_markdown(
         self,
         image_path: str,
@@ -213,13 +222,14 @@ class LlmModel:
 
         # Provide a snippet of the previous page for context if available.
         if previous_page_markdown:
+            snippet = self._last_tokens_text(previous_page_markdown, 100)
             user_content.append({
                 "type": "text",
                 "text": (
-                    "Here are the last few characters in Markdown format from the previous page to provide context.\n"
+                    "Here are the last few tokens in Markdown format from the previous page to provide context.\n"
                     "The final output has no page breaks. "
                     "For consistency, use the same style.\n"
-                    f"<!-- PAGE SEPARATOR -->\n{previous_page_markdown[-100:]}"
+                    f"<!-- PAGE SEPARATOR -->\n{snippet}"
                 ),
             })
 
@@ -271,63 +281,4 @@ class LlmModel:
         except Exception as err: 
             raise LLMProcessingError(
                 f"Image to Markdown LLM call failed: {err}"
-            ) from err
-
-    async def postprocess_markdown(self, markdowns: List[str]) -> ModelResult:
-        """
-        Combine and finalize Markdown chunks. Optionally clean or optimize 
-        formatting, headings, etc.
-
-        Args:
-            markdowns (List[str]): List of individual Markdown strings to combine.
-
-        Returns:
-            ModelResult: The final combined Markdown and token usage details.
-        """
-        logger.debug("Post-processing %s markdown chunks", len(markdowns))
-
-        combined_markdown = "\n".join(markdowns)
-        input_tokens = self._calculate_tokens(self._model_name, combined_markdown)
-        max_output_tokens = LLMConfig.get_max_tokens_for_model(self._model_name)["output_tokens"]
-        if input_tokens >= max_output_tokens:
-            raise RuntimeError("Too many tokens to post-process.")
-
-        separator = "\n---PAGE BREAK---\n"
-        user_content = separator.join(markdowns)
-
-        messages = [
-            {"role": "system", "content": FINAL_REVIEW_PROMPT},
-            {"role": "user", "content": user_content}
-        ]
-
-        # Log messages if DEBUG level is enabled
-        self._maybe_log_debug_messages(messages)
-
-        try:
-            response = await acompletion(
-                model=self._model_name,
-                messages=messages,
-            )
-
-            raw_content = response.choices[0].message.content.strip()
-            content = self._strip_code_fences(raw_content)
-
-            # Log the final content if DEBUG level is enabled
-            self._maybe_log_debug_messages([
-                {"role": "assistant", "content": content}
-            ])
-
-            usage = response.usage
-            total_cost = self._calculate_cost(usage)
-
-            return ModelResult(
-                content=content,
-                prompt_tokens=usage.prompt_tokens,
-                completion_tokens=usage.completion_tokens,
-                cost=total_cost
-            )
-
-        except Exception as err:
-            raise LLMProcessingError(
-                f"Post-processing LLM call failed: {err}"
             ) from err

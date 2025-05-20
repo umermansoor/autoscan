@@ -20,7 +20,6 @@ async def test_autoscan_successful(tmp_path):
          patch("autoscan.autoscan._process_images_async", new=AsyncMock(return_value=(["Markdown Page 1", "Markdown Page 2"], 100, 200, 0.5))) as mock_process, \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value=str(output_dir / "sample.md"))) as mock_write, \
          patch("autoscan.autoscan.LlmModel") as MockModel, \
-         patch("autoscan.autoscan._postprocess_markdown", return_value="Markdown Page 1\nMarkdown Page 2"), \
          patch("os.makedirs") as mock_makedirs:
 
         # Mock the LlmModel
@@ -66,7 +65,6 @@ async def test_autoscan_no_images_generated(tmp_path):
     # Mock dependencies
     with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(temp_dir / "sample.pdf"))), \
          patch("autoscan.autoscan.pdf_to_images", new=MagicMock(return_value=[])), \
-         patch("autoscan.autoscan._postprocess_markdown", return_value=""), \
          patch("os.makedirs"):
         with pytest.raises(PDFPageToImageConversionError, match="Failed to convert PDF pages to images."):
             await autoscan(pdf_path, temp_dir=str(temp_dir))
@@ -84,7 +82,6 @@ async def test_autoscan_temp_dir_cleanup(tmp_path):
          patch("autoscan.autoscan._process_images_async", new=AsyncMock(return_value=(["Markdown Page 1"], 50, 50, 0.1))), \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="sample.pdf")) as mock_write, \
          patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup, \
-         patch("autoscan.autoscan._postprocess_markdown", return_value=""), \
          patch("os.makedirs"):
         # Run the function
         await autoscan(pdf_path, temp_dir=str(temp_dir), cleanup_temp=True)
@@ -103,7 +100,6 @@ async def test_autoscan_no_cleanup(tmp_path):
          patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
          patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup, \
-         patch("autoscan.autoscan._postprocess_markdown", return_value=""), \
          patch("os.makedirs"):
         await autoscan(pdf_path, temp_dir=str(temp_dir), cleanup_temp=False)
         mock_cleanup.assert_not_called()
@@ -121,7 +117,6 @@ async def test_autoscan_model_failure(tmp_path):
     with patch("autoscan.autoscan.get_or_download_file", return_value=str(temp_dir / "sample.pdf")), \
          patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png"]), \
          patch("autoscan.autoscan.LlmModel") as MockModel, \
-         patch("autoscan.autoscan._postprocess_markdown", return_value=""), \
          patch("os.makedirs"):
         model_instance = MockModel.return_value
         model_instance.image_to_markdown_completion = mock_completion
@@ -141,7 +136,6 @@ async def test_autoscan_markdown_write_failure(tmp_path):
          patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png"]), \
          patch("autoscan.autoscan._process_images_async", return_value=(["Some content"], 10, 20, 0.2)), \
          patch("autoscan.autoscan.write_text_to_file", return_value=None), \
-         patch("autoscan.autoscan._postprocess_markdown", return_value=""), \
          patch("os.makedirs"):
         with pytest.raises(MarkdownFileWriteError):
             await autoscan(pdf_path, temp_dir=str(temp_dir))
@@ -158,7 +152,6 @@ async def test_autoscan_with_custom_concurrency(tmp_path):
          patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png", "image2.png", "image3.png"]) as mock_pdf_to_images, \
          patch("autoscan.autoscan._process_images_async", return_value=(["Page1", "Page2", "Page3"], 30, 60, 0.3)) as mock_process, \
          patch("autoscan.autoscan.write_text_to_file", return_value=str(output_dir / "sample.md")), \
-         patch("autoscan.autoscan._postprocess_markdown", return_value="Page1 Page2 Page3"), \
          patch("os.makedirs"):
         # Run with concurrency=2
         result = await autoscan(pdf_path, temp_dir=str(temp_dir), output_dir=str(output_dir), concurrency=2)
