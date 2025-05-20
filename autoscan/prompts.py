@@ -5,8 +5,8 @@ You are given an image of a PDF page (called main image). Your task is to conver
 
 1. **General Guidelines:**
     - Convert **all** meaningful textual content from the main image into Markdown. This includes: 
-        - Headings, paragraphs, lists, footnotes, side notes, captions, and any other text blocks.
-        - **Do not** include page numbers or repetitive headers/footers with no meaningful content. 
+        - Headings, paragraphs, lists, footnotes, side notes, captions, and any other text blocks. You'll need to infer these from the layout and make best possible formatting decisions. E.g. if you notice a list implicitly e.g. the items are indented, or if you see a heading, or a caption, etc. Use appropriate Markdown syntax for each type of content:
+        - **Do not** include page numbers or repetitive headers/footers with no meaningful content or have already been captured.
     - If underlining or other emphasis can't be directly represented, default to italics  (`*...*` or `_..._`).
     - Retain URLs, but convert them to Markdown links: `[link text](url)`
     - Use `>` for blockquotes and sidebars.
@@ -34,21 +34,3 @@ You are given an image of a PDF page (called main image). Your task is to conver
 
 **Your response must follow these rules and contain only the converted Markdown content.**
     """
-
-FINAL_REVIEW_PROMPT = """
-You have been provided multiple Markdown files, each representing a single PDF page that was independently converted by an LLM. These individual pages may contain inconsistencies in headings, paragraph breaks, and formatting. Your goal is to merge them into one coherent, well-structured Markdown document. Follow the instructions below:
-
-**Instructions:**
-1. **Combine and Clean:** Consolidate all pages into a single document. Remove any `---PAGE BREAK---` or similar markers.
-2. **Consistent Headings and Structure:** Ensure headings follow a logical hierarchy throughout. Fix any inconsistent heading levels.
-3. **Paragraph Flow:** Merge paragraphs when appropriate to create smooth transitions. Remove unnecessary line breaks.
-4. **Standardize Formatting:** 
-   - Ensure lists, tables, footnotes, image descriptions, and code blocks have consistent formatting.
-   - If the text contains repeated headers or footers, remove duplicates that do not add new meaning.
-5. **Maintain Content:** Retain all original information. Do not remove any meaningful text. Eliminate redundancies or obvious errors without altering the text's meaning.
-6. **Math and LaTeX:** Replace any `\(...\)` LaTeX formatting with `$$...$$` for proper KaTeX rendering.
-7. **Output Requirements:** 
-   - Return only the revised, merged Markdown.
-   - Enclose the final output in a fenced code block (triple backticks).
-   - Do not include any commentary or explanation of your changes.
-"""

@@ -78,7 +78,6 @@ async def autoscan(
             raise ValueError("accuracy must be one of 'low', 'medium', or 'high'")
 
         sequential = accuracy == "high"
-        do_postprocess = accuracy in {"medium", "high"}
 
         (
             aggregated_markdown,
@@ -93,10 +92,7 @@ async def autoscan(
             user_instructions=user_instructions,
         )
 
-        if do_postprocess:
-            markdown_content = await _postprocess_markdown(aggregated_markdown, model)
-        else:
-            markdown_content = "\n".join(aggregated_markdown).replace("---PAGE BREAK---", "")
+        markdown_content = "\n\n".join(aggregated_markdown).replace("---PAGE BREAK---", "")
 
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
@@ -136,20 +132,6 @@ async def autoscan(
         if cleanup_temp and images:
             await asyncio.to_thread(_cleanup_temp_files, images)
 
-async def _postprocess_markdown(markdown: List[str], model: LlmModel) -> str:
-    """
-    Post-process the markdown content using the given LLM model.
-
-    Args:
-        markdown: List of markdown strings to process.
-        model: LlmModel instance for review.
-
-    Returns:
-        The aggregated markdown content.
-    """
-    result = await model.postprocess_markdown(markdown)
-
-    return result.content
 
 async def _process_images_async(
     pdf_page_images: List[str],
