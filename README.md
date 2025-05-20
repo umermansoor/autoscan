@@ -81,7 +81,7 @@ After installing dependencies (e.g. `poetry install`), run `autoscan` from the c
 ```sh
 autoscan path/to/your/file.pdf
 
-# Choose accuracy level (low, medium, high):
+# Choose accuracy level (low or high):
 autoscan --accuracy high path/to/your/file.pdf
 
 # Specify a model (default is `openai/gpt-4o`):
@@ -93,7 +93,7 @@ autoscan --instructions "This is an invoice; use GitHub tables" path/to/your/fil
 
 ### Accuracy Levels
 
-`low`, `medium`, and `high` are supported. Higher accuracy processes pages sequentially. When using `high`, the entire previous page is sent back to the model for context, which increases token usage (cost) and runtime.
+Two accuracy levels are available: `low` and `high`. `low` processes pages in parallel, while `high` processes them sequentially. In `high` mode the entire previous page is returned to the model so it can rewrite that page together with the current one for consistent formatting. The model responds in JSON with `page_1` and `page_2` fields so AutoScan can replace the prior page with the updated version. This increases token usage and runtime.
 
 ### Programmatic Example
 
@@ -125,7 +125,7 @@ Configure models and other parameters using the `autoscan` function signature:
 async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
-    accuracy: str = "medium",
+    accuracy: str = "low",
     user_instructions: Optional[str] = None,
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,

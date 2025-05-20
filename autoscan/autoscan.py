@@ -1,6 +1,7 @@
 import asyncio
 import os
 import logging
+import json
 from typing import List, Optional, Tuple
 from datetime import datetime
 import tempfile
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
-    accuracy: str = "medium",
+    accuracy: str = "low",
     user_instructions: Optional[str] = None,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
@@ -33,7 +34,7 @@ async def autoscan(
     ## Args
     - `pdf_path` (str): **Required.** Path to the input PDF file.
     - `model_name` (str, optional): Name of the AI model to process image-to-text conversion. Defaults to `"openai/gpt-4o"`.
-    - `accuracy` (str, optional): One of `low`, `medium`, or `high` determining processing strategy. Defaults to `"medium"`.
+    - `accuracy` (str, optional): Either `low` or `high` determining processing strategy. Defaults to `"low"`.
     - `user_instructions` (str, optional): Additional context or instructions passed directly to the LLM.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the current directory's "output" subfolder if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
@@ -74,8 +75,8 @@ async def autoscan(
         logger.info(f"Initialized model: {model_name}")
 
         # Process images
-        if accuracy not in {"low", "medium", "high"}:
-            raise ValueError("accuracy must be one of 'low', 'medium', or 'high'")
+        if accuracy not in {"low", "high"}:
+            raise ValueError("accuracy must be either 'low' or 'high'")
 
         sequential = accuracy == "high"
 
@@ -168,21 +169,45 @@ async def _process_images_async(
                 ) from e
 
     if sequential:
-        valid_results = []
+        all_results = []
+        pages: List[str] = []
         last_page_markdown = None
         for img in pdf_page_images:
-            result = await process_single_image(img, previous_page_markdown=last_page_markdown)
-            if result:
-                valid_results.append(result)
+            result = await process_single_image(
+                img, previous_page_markdown=last_page_markdown
+            )
+            if not result:
+                continue
+            all_results.append(result)
+            if last_page_markdown is None:
+                pages.append(result.content)
                 last_page_markdown = result.content
+            else:
+                try:
+                    parsed = json.loads(result.content)
+                    page_1 = parsed.get("page_1", last_page_markdown)
+                    page_2 = parsed.get("page_2", result.content)
+                except Exception:
+                    page_1 = last_page_markdown
+                    page_2 = result.content
+
+                if pages:
+                    pages[-1] = page_1
+                else:
+                    pages.append(page_1)
+                pages.append(page_2)
+                last_page_markdown = page_2
+
+        aggregated_markdown = pages
+        token_results = all_results
     else:
         results = await asyncio.gather(*(process_single_image(img) for img in pdf_page_images))
         valid_results = [r for r in results if r]
-
-    aggregated_markdown = [r.content for r in valid_results]
-    total_prompt_tokens = sum(r.prompt_tokens for r in valid_results)
-    total_completion_tokens = sum(r.completion_tokens for r in valid_results)
-    total_cost = sum(r.cost for r in valid_results)
+        aggregated_markdown = [r.content for r in valid_results]
+        token_results = valid_results
+    total_prompt_tokens = sum(r.prompt_tokens for r in token_results)
+    total_completion_tokens = sum(r.completion_tokens for r in token_results)
+    total_cost = sum(r.cost for r in token_results)
 
     logger.debug(
         "Processed %s images: prompt_tokens=%s completion_tokens=%s cost=%s",

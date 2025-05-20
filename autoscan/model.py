@@ -7,7 +7,7 @@ from litellm import acompletion
 
 from .image_processing import image_to_base64
 from .types import ModelResult
-from .prompts import DEFAULT_SYSTEM_PROMPT
+from .prompts import DEFAULT_SYSTEM_PROMPT, HIGH_ACCURACY_PROMPT
 from .config import LLMConfig
 from .utils.env import ensure_env_for_model
 import tiktoken
@@ -25,18 +25,21 @@ class LlmModel:
     def __init__(
         self,
         model_name: str = "openai/gpt-4o",
-        accuracy: str = "medium"
+        accuracy: str = "low"
     ):
         """
         Initialize the LLM model interface.
 
         Args:
             model_name (str): The model name to use. Defaults to "openai/gpt-4o".
-            accuracy (str): An accuracy level descriptor. Defaults to "medium".
+            accuracy (str): An accuracy level descriptor. Defaults to "low".
         """
         self._model_name = model_name
         self._accuracy = accuracy
-        self._system_prompt = DEFAULT_SYSTEM_PROMPT
+        if accuracy == "high":
+            self._system_prompt = HIGH_ACCURACY_PROMPT
+        else:
+            self._system_prompt = DEFAULT_SYSTEM_PROMPT
         ensure_env_for_model(model_name)
 
     @staticmethod
@@ -166,17 +169,6 @@ class LlmModel:
         logger.debug("Calculated %s tokens for model %s", token_count, model_name)
         return token_count
 
-    def _get_last_n_tokens(self, text: str, n: int) -> str:
-        """Return the last ``n`` tokens from ``text`` using the model's tokenizer."""
-        try:
-            encoding = tiktoken.encoding_for_model(self._model_name)
-        except KeyError:
-            encoding = tiktoken.get_encoding("cl100k_base")
-
-        tokens = encoding.encode(text)
-        last_tokens = tokens[-n:]
-        return encoding.decode(last_tokens)
-
     async def image_to_markdown(
         self,
         image_path: str,
@@ -222,18 +214,12 @@ class LlmModel:
 
         # Provide previous page context if available.
         if previous_page_markdown:
-            if self._accuracy == "high":
-                context_md = previous_page_markdown
-                intro = (
-                    "Here is the converted markdown of the previous page to provide you context and to help you maintain consistency in the output.\n"
-                    "Do not change or alter this content; ensure that the final output has no page breaks."
-                )
-            else:
-                context_md = self._get_last_n_tokens(previous_page_markdown, 100)
-                intro = (
-                    "Here is the converted markdown of the last few words from the previous page to provide you context and to help you maintain consistency in the output.\n"
-                    "Do not change or alter this content; ensure that the final output has no page breaks."
-                )
+            context_md = previous_page_markdown
+            intro = (
+                "Here is the converted markdown of the previous page. "
+                "Rewrite both the previous page and this page so they align in tone, "
+                "layout, and formatting. Ensure the final output has no page breaks."
+            )
 
             user_content.append({
                 "type": "text",
@@ -255,10 +241,11 @@ class LlmModel:
         self._maybe_log_debug_messages(messages)
 
         try:
-            response = await acompletion(
-                model=self._model_name,
-                messages=messages,
-            )
+            completion_kwargs = {"model": self._model_name, "messages": messages}
+            if self._accuracy == "high":
+                completion_kwargs["response_format"] = {"type": "json_object"}
+
+            response = await acompletion(**completion_kwargs)
 
             # Extract relevant parts of the LLM response
             raw_content = response.choices[0].message.content.strip()

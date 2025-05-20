@@ -34,3 +34,20 @@ You are given an image of a PDF page (called main image). Your task is to conver
 
 **Your response must follow these rules and contain only the converted Markdown content.**
     """
+
+HIGH_ACCURACY_PROMPT = (
+    DEFAULT_SYSTEM_PROMPT
+    + """
+
+When provided with Markdown from a previous page, rewrite that page together
+with the current page so that tone, formatting, and layout are consistent.
+Return your answer as JSON:
+
+{
+  "page_1": "<revised previous page>",
+  "page_2": "<revised current page>"
+}
+
+If no previous page is given, return plain Markdown as usual.
+"""
+)
