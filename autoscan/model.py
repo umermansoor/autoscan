@@ -25,14 +25,14 @@ class LlmModel:
     def __init__(
         self,
         model_name: str = "openai/gpt-4o",
-        accuracy: str = "medium"
+        accuracy: str = "low"
     ):
         """
         Initialize the LLM model interface.
 
         Args:
             model_name (str): The model name to use. Defaults to "openai/gpt-4o".
-            accuracy (str): An accuracy level descriptor. Defaults to "medium".
+            accuracy (str): An accuracy level descriptor. Defaults to "low".
         """
         self._model_name = model_name
         self._accuracy = accuracy
@@ -225,8 +225,9 @@ class LlmModel:
             if self._accuracy == "high":
                 context_md = previous_page_markdown
                 intro = (
-                    "Here is the converted markdown of the previous page to provide you context and to help you maintain consistency in the output.\n"
-                    "Do not change or alter this content; ensure that the final output has no page breaks."
+                    "Here is the converted markdown of the previous page. "
+                    "Rewrite both the previous page and this page so they align in tone, "
+                    "layout, and formatting. Ensure the final output has no page breaks."
                 )
             else:
                 context_md = self._get_last_n_tokens(previous_page_markdown, 100)

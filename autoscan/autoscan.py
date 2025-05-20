@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
-    accuracy: str = "medium",
+    accuracy: str = "low",
     user_instructions: Optional[str] = None,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
@@ -33,7 +33,7 @@ async def autoscan(
     ## Args
     - `pdf_path` (str): **Required.** Path to the input PDF file.
     - `model_name` (str, optional): Name of the AI model to process image-to-text conversion. Defaults to `"openai/gpt-4o"`.
-    - `accuracy` (str, optional): One of `low`, `medium`, or `high` determining processing strategy. Defaults to `"medium"`.
+    - `accuracy` (str, optional): Either `low` or `high` determining processing strategy. Defaults to `"low"`.
     - `user_instructions` (str, optional): Additional context or instructions passed directly to the LLM.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the current directory's "output" subfolder if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
@@ -74,8 +74,8 @@ async def autoscan(
         logger.info(f"Initialized model: {model_name}")
 
         # Process images
-        if accuracy not in {"low", "medium", "high"}:
-            raise ValueError("accuracy must be one of 'low', 'medium', or 'high'")
+        if accuracy not in {"low", "high"}:
+            raise ValueError("accuracy must be either 'low' or 'high'")
 
         sequential = accuracy == "high"
 
@@ -168,21 +168,27 @@ async def _process_images_async(
                 ) from e
 
     if sequential:
-        valid_results = []
         last_page_markdown = None
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        total_cost = 0.0
         for img in pdf_page_images:
-            result = await process_single_image(img, previous_page_markdown=last_page_markdown)
+            result = await process_single_image(
+                img, previous_page_markdown=last_page_markdown
+            )
             if result:
-                valid_results.append(result)
+                total_prompt_tokens += result.prompt_tokens
+                total_completion_tokens += result.completion_tokens
+                total_cost += result.cost
                 last_page_markdown = result.content
+        aggregated_markdown = [last_page_markdown] if last_page_markdown else []
     else:
         results = await asyncio.gather(*(process_single_image(img) for img in pdf_page_images))
         valid_results = [r for r in results if r]
-
-    aggregated_markdown = [r.content for r in valid_results]
-    total_prompt_tokens = sum(r.prompt_tokens for r in valid_results)
-    total_completion_tokens = sum(r.completion_tokens for r in valid_results)
-    total_cost = sum(r.cost for r in valid_results)
+        aggregated_markdown = [r.content for r in valid_results]
+        total_prompt_tokens = sum(r.prompt_tokens for r in valid_results)
+        total_completion_tokens = sum(r.completion_tokens for r in valid_results)
+        total_cost = sum(r.cost for r in valid_results)
 
     logger.debug(
         "Processed %s images: prompt_tokens=%s completion_tokens=%s cost=%s",

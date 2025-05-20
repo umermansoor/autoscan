@@ -184,5 +184,5 @@ async def test_process_images_async_sequential():
     )
 
     assert calls == [None, "md_p1.png", "md_p2.png"]
-    assert result[0] == ["md_p1.png", "md_p2.png", "md_p3.png"]
+    assert result[0] == ["md_p3.png"]
 

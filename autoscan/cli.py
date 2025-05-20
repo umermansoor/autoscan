@@ -24,7 +24,7 @@ async def _process_file(
 async def _run(
     pdf_path: str | None = None,
     model: str = "openai/gpt-4o",
-    accuracy: str = "medium",
+    accuracy: str = "low",
     instructions: str | None = None,
 ) -> None:
     if pdf_path:
@@ -42,8 +42,8 @@ def main() -> None:
     parser.add_argument(
         "--accuracy",
         type=str,
-        choices=["low", "medium", "high"],
-        default="medium",
+        choices=["low", "high"],
+        default="low",
         help="Conversion accuracy level",
     )
     parser.add_argument(
