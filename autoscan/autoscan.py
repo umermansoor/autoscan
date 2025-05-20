@@ -92,7 +92,7 @@ async def autoscan(
             user_instructions=user_instructions,
         )
 
-        markdown_content = "\n".join(aggregated_markdown).replace("---PAGE BREAK---", "")
+        markdown_content = "\n\n".join(aggregated_markdown).replace("---PAGE BREAK---", "")
 
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
