@@ -93,7 +93,7 @@ autoscan --instructions "This is an invoice; use GitHub tables" path/to/your/fil
 
 ### Accuracy Levels
 
-`low`, `medium`, and `high` are supported. Higher accuracy processes pages sequentially and performs an additional review step, which increases token usage (cost) and runtime.
+`low`, `medium`, and `high` are supported. Higher accuracy processes pages sequentially. When using `high`, the entire previous page is sent back to the model for context, which increases token usage (cost) and runtime.
 
 ### Programmatic Example
 
@@ -115,7 +115,7 @@ asyncio.run(main())
 
 1. **Convert PDF to Images**: Each page of the PDF is converted into an image.
 2. **Process Images with LLM**: The images are processed by the LLM to generate Markdown.
-3. **Aggregate Markdown**: All Markdown output is combined into one file (on `accuracy==low` markdowns are combined together using a simple algorithm; on `accuracy==medium,high` an LLM is used to combine all outputs together)
+3. **Aggregate Markdown**: All Markdown output is combined into one file using a simple algorithm.
 
 ## Configuration
 

@@ -7,7 +7,7 @@ from litellm import acompletion
 
 from .image_processing import image_to_base64
 from .types import ModelResult
-from .prompts import DEFAULT_SYSTEM_PROMPT, FINAL_REVIEW_PROMPT
+from .prompts import DEFAULT_SYSTEM_PROMPT
 from .config import LLMConfig
 from .utils.env import ensure_env_for_model
 import tiktoken
@@ -167,6 +167,17 @@ class LlmModel:
         logger.debug("Calculated %s tokens for model %s", token_count, model_name)
         return token_count
 
+    def _get_last_n_tokens(self, text: str, n: int) -> str:
+        """Return the last ``n`` tokens from ``text`` using the model's tokenizer."""
+        try:
+            encoding = tiktoken.encoding_for_model(self._model_name)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+
+        tokens = encoding.encode(text)
+        last_tokens = tokens[-n:]
+        return encoding.decode(last_tokens)
+
     async def image_to_markdown(
         self,
         image_path: str,
@@ -211,16 +222,24 @@ class LlmModel:
             }
         ]
 
-        # Provide a snippet of the previous page for context if available.
+        # Provide previous page context if available.
         if previous_page_markdown:
+            if self._accuracy == "high":
+                context_md = previous_page_markdown
+                intro = (
+                    "Here is the previous page in Markdown format to provide context.\n"
+                    "Use the same style; the final output has no page breaks."
+                )
+            else:
+                context_md = self._get_last_n_tokens(previous_page_markdown, 100)
+                intro = (
+                    "Here are the last 100 tokens from the previous page in Markdown format to provide context.\n"
+                    "Use the same style; the final output has no page breaks."
+                )
+
             user_content.append({
                 "type": "text",
-                "text": (
-                    "Here are the last few characters in Markdown format from the previous page to provide context.\n"
-                    "The final output has no page breaks. "
-                    "For consistency, use the same style.\n"
-                    f"<!-- PAGE SEPARATOR -->\n{previous_page_markdown[-100:]}"
-                ),
+                "text": f"{intro}\n<!-- PAGE SEPARATOR -->\n{context_md}",
             })
 
         # If there are additional user instructions, include them.
@@ -271,63 +290,4 @@ class LlmModel:
         except Exception as err: 
             raise LLMProcessingError(
                 f"Image to Markdown LLM call failed: {err}"
-            ) from err
-
-    async def postprocess_markdown(self, markdowns: List[str]) -> ModelResult:
-        """
-        Combine and finalize Markdown chunks. Optionally clean or optimize 
-        formatting, headings, etc.
-
-        Args:
-            markdowns (List[str]): List of individual Markdown strings to combine.
-
-        Returns:
-            ModelResult: The final combined Markdown and token usage details.
-        """
-        logger.debug("Post-processing %s markdown chunks", len(markdowns))
-
-        combined_markdown = "\n".join(markdowns)
-        input_tokens = self._calculate_tokens(self._model_name, combined_markdown)
-        max_output_tokens = LLMConfig.get_max_tokens_for_model(self._model_name)["output_tokens"]
-        if input_tokens >= max_output_tokens:
-            raise RuntimeError("Too many tokens to post-process.")
-
-        separator = "\n---PAGE BREAK---\n"
-        user_content = separator.join(markdowns)
-
-        messages = [
-            {"role": "system", "content": FINAL_REVIEW_PROMPT},
-            {"role": "user", "content": user_content}
-        ]
-
-        # Log messages if DEBUG level is enabled
-        self._maybe_log_debug_messages(messages)
-
-        try:
-            response = await acompletion(
-                model=self._model_name,
-                messages=messages,
-            )
-
-            raw_content = response.choices[0].message.content.strip()
-            content = self._strip_code_fences(raw_content)
-
-            # Log the final content if DEBUG level is enabled
-            self._maybe_log_debug_messages([
-                {"role": "assistant", "content": content}
-            ])
-
-            usage = response.usage
-            total_cost = self._calculate_cost(usage)
-
-            return ModelResult(
-                content=content,
-                prompt_tokens=usage.prompt_tokens,
-                completion_tokens=usage.completion_tokens,
-                cost=total_cost
-            )
-
-        except Exception as err:
-            raise LLMProcessingError(
-                f"Post-processing LLM call failed: {err}"
             ) from err
