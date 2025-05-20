@@ -5,8 +5,8 @@ You are given an image of a PDF page (called main image). Your task is to conver
 
 1. **General Guidelines:**
     - Convert **all** meaningful textual content from the main image into Markdown. This includes: 
-        - Headings, paragraphs, lists, footnotes, side notes, captions, and any other text blocks.
-        - **Do not** include page numbers or repetitive headers/footers with no meaningful content. 
+        - Headings, paragraphs, lists, footnotes, side notes, captions, and any other text blocks. You'll need to infer these from the layout and make best possible formatting decisions. E.g. if you notice a list implicitly e.g. the items are indented, or if you see a heading, or a caption, etc. Use appropriate Markdown syntax for each type of content:
+        - **Do not** include page numbers or repetitive headers/footers with no meaningful content or have already been captured.
     - If underlining or other emphasis can't be directly represented, default to italics  (`*...*` or `_..._`).
     - Retain URLs, but convert them to Markdown links: `[link text](url)`
     - Use `>` for blockquotes and sidebars.

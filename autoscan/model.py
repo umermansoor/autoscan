@@ -128,8 +128,7 @@ class LlmModel:
 
     def _calculate_cost(self, usage) -> float:
         """
-        Safely calculate the cost for the given usage object. 
-        If cost calculation fails, return 0.0 and log an error.
+        Safely calculate the cost for the given usage object. If cost calculation fails, return 0.0 and log an error.
 
         Args:
             usage (Any): The usage object returned by the LLM API.
@@ -189,8 +188,7 @@ class LlmModel:
 
         Args:
             image_path (str): Path to the image file of the PDF page.
-            previous_page_markdown (Optional[str]): Markdown of the previous page 
-                                                    (for formatting context).
+            previous_page_markdown (Optional[str]): Markdown of the previous page (for formatting context).
             user_instructions (Optional[str]): Additional instructions from the user.
 
         Returns:
@@ -227,14 +225,14 @@ class LlmModel:
             if self._accuracy == "high":
                 context_md = previous_page_markdown
                 intro = (
-                    "Here is the previous page in Markdown format to provide context.\n"
-                    "Use the same style; the final output has no page breaks."
+                    "Here is the converted markdown of the previous page to provide you context and to help you maintain consistency in the output.\n"
+                    "Do not change or alter this content; ensure that the final output has no page breaks."
                 )
             else:
                 context_md = self._get_last_n_tokens(previous_page_markdown, 100)
                 intro = (
-                    "Here are the last 100 tokens from the previous page in Markdown format to provide context.\n"
-                    "Use the same style; the final output has no page breaks."
+                    "Here is the converted markdown of the last few words from the previous page to provide you context and to help you maintain consistency in the output.\n"
+                    "Do not change or alter this content; ensure that the final output has no page breaks."
                 )
 
             user_content.append({
