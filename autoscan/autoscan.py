@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
-    accuracy: str = "medium",
+    accuracy: str = "high", 
     user_instructions: Optional[str] = None,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
@@ -33,7 +33,7 @@ async def autoscan(
     ## Args
     - `pdf_path` (str): **Required.** Path to the input PDF file.
     - `model_name` (str, optional): Name of the AI model to process image-to-text conversion. Defaults to `"openai/gpt-4o"`.
-    - `accuracy` (str, optional): One of `low`, `medium`, or `high` determining processing strategy. Defaults to `"medium"`.
+    - `accuracy` (str, optional): One of `low` or `high` determining processing strategy. Defaults to `"high"`.
     - `user_instructions` (str, optional): Additional context or instructions passed directly to the LLM.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the current directory's "output" subfolder if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
@@ -74,8 +74,8 @@ async def autoscan(
         logger.info(f"Initialized model: {model_name}")
 
         # Process images
-        if accuracy not in {"low", "medium", "high"}:
-            raise ValueError("accuracy must be one of 'low', 'medium', or 'high'")
+        if accuracy not in {"low", "high"}:  
+            raise ValueError("accuracy must be one of 'low' or 'high'")
 
         sequential = accuracy == "high"
 
@@ -92,7 +92,34 @@ async def autoscan(
             user_instructions=user_instructions,
         )
 
-        markdown_content = "\n\n".join(aggregated_markdown).replace("---PAGE BREAK---", "")
+        # New logic for joining markdown pages
+        if not aggregated_markdown:
+            markdown_content = ""
+        else:
+            # First, handle any potential "---PAGE BREAK---" markers within page content itself.
+            # This is a safeguard; current prompts don't request this marker.
+            cleaned_pages = [page.replace("---PAGE BREAK---", "") for page in aggregated_markdown]
+
+            # Strip whitespace from each page and filter out pages that become empty
+            # after cleaning and stripping.
+            valid_pages = [page.strip() for page in cleaned_pages if page.strip()]
+
+            if not valid_pages:
+                markdown_content = ""
+            else:
+                markdown_content_parts = [valid_pages[0]]
+                for i in range(1, len(valid_pages)):
+                    prev_page_md_stripped = valid_pages[i-1]
+                    current_page_md_stripped = valid_pages[i]
+
+                    # Condition for single newline: previous ends like a table row, current starts like one.
+                    if prev_page_md_stripped.endswith("|") and current_page_md_stripped.startswith("|"):
+                        # Join with a single newline to continue the table
+                        markdown_content_parts.append("\n" + current_page_md_stripped)
+                    else:
+                        # Default join with two newlines for separate blocks
+                        markdown_content_parts.append("\n\n" + current_page_md_stripped)
+                markdown_content = "".join(markdown_content_parts)
 
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
