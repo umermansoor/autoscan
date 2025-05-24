@@ -12,6 +12,7 @@ async def _process_file(
     model: str,
     accuracy: str,
     instructions: str | None = None,
+    save_llm_calls: bool = False, # Added save_llm_calls
 ) -> None:
     logging.info(f"Processing file: {pdf_path}")
     await autoscan(
@@ -19,6 +20,7 @@ async def _process_file(
         model_name=model,
         accuracy=accuracy,
         user_instructions=instructions,
+        save_llm_calls=save_llm_calls, # Pass save_llm_calls
     )
 
 async def _run(
@@ -26,9 +28,10 @@ async def _run(
     model: str = "openai/gpt-4o",
     accuracy: str = "high",  # Changed default to "high"
     instructions: str | None = None,
+    save_llm_calls: bool = False, # Added save_llm_calls
 ) -> None:
     if pdf_path:
-        await _process_file(pdf_path, model, accuracy, instructions)
+        await _process_file(pdf_path, model, accuracy, instructions, save_llm_calls) # Pass save_llm_calls
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -64,6 +67,11 @@ def main() -> None:
         choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
         help="Set the logging level",
     )
+    parser.add_argument( # Added argument for save_llm_calls
+        "--save-llm-calls",
+        action="store_true", # Makes it a boolean flag
+        help="Save LLM prompts and responses to output/output.txt",
+    )
 
     args = parser.parse_args()
 
@@ -87,6 +95,7 @@ def main() -> None:
             model=args.model,
             accuracy=args.accuracy,
             instructions=args.instructions,
+            save_llm_calls=args.save_llm_calls, # Pass save_llm_calls
         )
     )
 

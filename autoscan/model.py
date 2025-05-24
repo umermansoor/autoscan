@@ -1,6 +1,7 @@
 import os
 import logging
 from typing import List, Dict, Any, Optional
+import datetime # Added for timestamp
 
 import litellm
 from litellm import acompletion
@@ -18,14 +19,15 @@ logger = logging.getLogger(__name__)
 class LlmModel:
     """
     A model class that converts a PDF page (provided as an image) into Markdown
-    using an LLM. It can maintain formatting consistency with previously 
+    using an LLM. It can maintain formatting consistency with previously
     processed pages.
     """
 
     def __init__(
         self,
         model_name: str = "openai/gpt-4o",
-        accuracy: str = "medium"
+        accuracy: str = "medium",
+        save_llm_calls: bool = False # Added save_llm_calls
     ):
         """
         Initialize the LLM model interface.
@@ -33,10 +35,12 @@ class LlmModel:
         Args:
             model_name (str): The model name to use. Defaults to "openai/gpt-4o".
             accuracy (str): An accuracy level descriptor. Defaults to "medium".
+            save_llm_calls (bool): Whether to save LLM calls to a file. Defaults to False.
         """
         self._model_name = model_name
         self._accuracy = accuracy
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
+        self._save_llm_calls = save_llm_calls # Store save_llm_calls
         ensure_env_for_model(model_name)
 
     @staticmethod
@@ -81,6 +85,60 @@ class LlmModel:
             prompt (str): The new system prompt.
         """
         self._system_prompt = prompt
+
+    def _log_llm_call_to_file(
+        self,
+        page_number: Optional[int],
+        system_prompt: str,
+        user_prompt_content: List[Dict[str, Any]],
+        response_or_error: str,
+        is_error: bool = False
+    ) -> None:
+        """
+        Log the LLM call details to a structured file.
+        """
+        if not self._save_llm_calls:
+            return
+
+        log_file_path = os.path.join(os.getcwd(), "output", "output.txt")
+        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+
+        timestamp = datetime.datetime.now().isoformat()
+        page_num_str = f"Page {page_number}" if page_number is not None else "Page N/A"
+
+        # Construct formatted user prompt
+        user_prompt_lines = []
+        for item in user_prompt_content:
+            if item.get("type") == "text":
+                user_prompt_lines.append(item.get("text", ""))
+            elif item.get("type") == "image_url":
+                url_data = item.get("image_url", {}).get("url", "")
+                if isinstance(url_data, str) and url_data.startswith("data:image"):
+                    base64_str = url_data.split(",", 1)[-1]
+                    user_prompt_lines.append(f"[Image Data (last 50 chars): ...{base64_str[-50:]}]")
+                else:
+                    user_prompt_lines.append(f"[Image URL: {url_data}]")
+        formatted_user_prompt = "\n".join(user_prompt_lines)
+
+        # Construct the full log entry
+        log_lines = [
+            f"Timestamp: {timestamp}",
+            f"Page Number: {page_num_str}",
+            "System Prompt:",
+            system_prompt,  # Assumes system_prompt has its own correct newlines
+            "User Prompt:",
+            formatted_user_prompt, # Assumes formatted_user_prompt has its own correct newlines
+            f"{'Error' if is_error else 'Assistant Response'}:",
+            response_or_error,  # Assumes response_or_error has its own correct newlines
+            "\n\n\n------------------------END-----------------------------\n\n\n"
+        ]
+        log_entry = "\n".join(log_lines) + "\n"  # Ensure a trailing newline for the whole entry
+
+        try:
+            with open(log_file_path, "a", encoding="utf-8") as f:
+                f.write(log_entry)
+        except Exception as e:
+            logger.error(f"Failed to write LLM call to log file: {e}")
 
     def _maybe_log_debug_messages(self, messages: List[Dict[str, Any]]) -> None:
         """
@@ -183,6 +241,7 @@ class LlmModel:
         previous_page_markdown: Optional[str] = None,
         user_instructions: Optional[str] = None,
         previous_page_image_path: Optional[str] = None,
+        page_number: Optional[int] = None, # Added page_number
     ) -> ModelResult:
         """
         Generate a Markdown representation of a PDF page from an image.
@@ -192,6 +251,7 @@ class LlmModel:
             previous_page_markdown (Optional[str]): Markdown of the previous page (for formatting context).
             user_instructions (Optional[str]): Additional instructions from the user.
             previous_page_image_path (Optional[str]): Path to the image file of the previous PDF page.
+            page_number (Optional[int]): The current page number being processed.
 
         Returns:
             ModelResult: The generated Markdown and token usage details.
@@ -207,7 +267,7 @@ class LlmModel:
                 f"Failed to convert image to base64: {str(e)}"
             ) from e
 
-        user_content = [
+        user_content: List[Dict[str, Any]] = [
             {
                 "type": "text",
                 "text": (
@@ -297,6 +357,15 @@ class LlmModel:
                 {"role": "assistant", "content": content}
             ])
 
+            # Log successful response if enabled
+            if self._save_llm_calls:
+                self._log_llm_call_to_file(
+                    page_number=page_number,
+                    system_prompt=system_prompt, # System prompt remains the same
+                    user_prompt_content=user_content, # User content remains the same
+                    response_or_error=content
+                )
+
             logger.debug(
                 "Tokens prompt=%s completion=%s cost=%s",
                 usage.prompt_tokens,
@@ -310,7 +379,16 @@ class LlmModel:
                 completion_tokens=usage.completion_tokens,
                 cost=total_cost
             )
-        except Exception as err: 
+        except Exception as err:
+            # Log error if enabled
+            if self._save_llm_calls:
+                self._log_llm_call_to_file(
+                    page_number=page_number,
+                    system_prompt=system_prompt,
+                    user_prompt_content=user_content,
+                    response_or_error=str(err),
+                    is_error=True
+                )
             raise LLMProcessingError(
                 f"Image to Markdown LLM call failed: {err}"
             ) from err

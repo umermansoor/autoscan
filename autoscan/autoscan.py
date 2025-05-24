@@ -23,6 +23,7 @@ async def autoscan(
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
+    save_llm_calls: bool = False, # Added save_llm_calls
 ) -> AutoScanOutput:
     """
     Convert a PDF to markdown by:
@@ -39,6 +40,7 @@ async def autoscan(
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
     - `cleanup_temp` (bool, optional): If `True`, cleans up temporary, intermediate files upon completion. Defaults to `True`.
     - `concurrency` (int, optional): Maximum number of concurrent model calls. Defaults to 10.
+    - `save_llm_calls` (bool, optional): Whether to save LLM calls to a file. Defaults to False.
 
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
@@ -70,7 +72,7 @@ async def autoscan(
         logger.info(f"Generated {len(images)} page images from PDF.")
 
         # Initialize the LLM
-        model = LlmModel(model_name=model_name, accuracy=accuracy)
+        model = LlmModel(model_name=model_name, accuracy=accuracy, save_llm_calls=save_llm_calls) # Pass save_llm_calls
         logger.info(f"Initialized model: {model_name}")
 
         # Process images
@@ -90,6 +92,8 @@ async def autoscan(
             concurrency=concurrency,
             sequential=sequential,
             user_instructions=user_instructions,
+            # save_llm_calls is part of the model instance now, no need to pass here
+            # page_number will be handled inside _process_images_async
         )
 
         # New logic for joining markdown pages
@@ -166,6 +170,7 @@ async def _process_images_async(
     concurrency: Optional[int] = 10,
     sequential: bool = False,
     user_instructions: Optional[str] = None,
+    # save_llm_calls is part of the model instance
 ) -> Tuple[List[str], int, int, float]:
     """
     Process each image using the given model to extract text.
@@ -179,14 +184,15 @@ async def _process_images_async(
 
     context = asyncio.Semaphore(concurrency)
 
-    async def process_single_image(image_path: str, previous_page_markdown: Optional[str] = None):
+    async def process_single_image(image_path: str, page_num: int, previous_page_markdown: Optional[str] = None):
         async with context:
-            logger.debug(f"Processing image {image_path}")
+            logger.debug(f"Processing image {image_path} (Page {page_num})")
             try:
                 return await model.image_to_markdown(
                     image_path,
                     previous_page_markdown=previous_page_markdown,
                     user_instructions=user_instructions,
+                    page_number=page_num # Pass page_number
                 )
             except Exception as e:
                 logger.exception(f"Error processing image {image_path}: {e}")
@@ -197,13 +203,18 @@ async def _process_images_async(
     if sequential:
         valid_results = []
         last_page_markdown = None
-        for img in pdf_page_images:
-            result = await process_single_image(img, previous_page_markdown=last_page_markdown)
+        for i, img in enumerate(pdf_page_images):
+            result = await process_single_image(img, page_num=i + 1, previous_page_markdown=last_page_markdown)
             if result:
                 valid_results.append(result)
                 last_page_markdown = result.content
     else:
-        results = await asyncio.gather(*(process_single_image(img) for img in pdf_page_images))
+        # Create tasks for concurrent processing
+        tasks = [
+            process_single_image(img, page_num=i + 1)
+            for i, img in enumerate(pdf_page_images)
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         valid_results = [r for r in results if r]
 
     aggregated_markdown = [r.content for r in valid_results]
