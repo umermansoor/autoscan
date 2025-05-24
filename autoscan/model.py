@@ -182,6 +182,7 @@ class LlmModel:
         image_path: str,
         previous_page_markdown: Optional[str] = None,
         user_instructions: Optional[str] = None,
+        previous_page_image_path: Optional[str] = None,
     ) -> ModelResult:
         """
         Generate a Markdown representation of a PDF page from an image.
@@ -190,6 +191,7 @@ class LlmModel:
             image_path (str): Path to the image file of the PDF page.
             previous_page_markdown (Optional[str]): Markdown of the previous page (for formatting context).
             user_instructions (Optional[str]): Additional instructions from the user.
+            previous_page_image_path (Optional[str]): Path to the image file of the previous PDF page.
 
         Returns:
             ModelResult: The generated Markdown and token usage details.
@@ -225,9 +227,32 @@ class LlmModel:
             if self._accuracy == "high":
                 context_md = previous_page_markdown
                 intro = (
-                    "Here is the converted markdown of the previous page to provide you context and to help you maintain consistency in the output.\n"
+                    "Here is the converted markdown and image of the previous page to provide you context and to help you maintain consistency in the output.\n"
                     "Do not change or alter this content; ensure that the final output has no page breaks."
                 )
+                if previous_page_image_path:
+                    if not os.path.exists(previous_page_image_path):
+                        logger.warning(f"Previous page image path does not exist: {previous_page_image_path}")
+                    else:
+                        try:
+                            base64_previous_image = image_to_base64(previous_page_image_path)
+                            user_content.append(
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{base64_previous_image}"
+                                    }
+                                }
+                            )
+                            user_content.append(
+                                {
+                                    "type": "text",
+                                    "text": "This is the image of the previous page."
+                                }
+                            )
+                        except Exception as e:
+                            logger.error(f"Failed to convert previous page image to base64: {str(e)}")
+
             else:
                 context_md = self._get_last_n_tokens(previous_page_markdown, 100)
                 intro = (
