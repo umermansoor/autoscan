@@ -184,7 +184,7 @@ async def _process_images_async(
 
     context = asyncio.Semaphore(concurrency)
 
-    async def process_single_image(image_path: str, page_num: int, previous_page_markdown: Optional[str] = None):
+    async def process_single_image(image_path: str, page_num: int, previous_page_markdown: Optional[str] = None, previous_page_image_path: Optional[str] = None):
         async with context:
             logger.debug(f"Processing image {image_path} (Page {page_num})")
             try:
@@ -192,6 +192,7 @@ async def _process_images_async(
                     image_path,
                     previous_page_markdown=previous_page_markdown,
                     user_instructions=user_instructions,
+                    previous_page_image_path=previous_page_image_path,
                     page_number=page_num # Pass page_number
                 )
             except Exception as e:
@@ -203,11 +204,18 @@ async def _process_images_async(
     if sequential:
         valid_results = []
         last_page_markdown = None
+        last_page_image_path = None
         for i, img in enumerate(pdf_page_images):
-            result = await process_single_image(img, page_num=i + 1, previous_page_markdown=last_page_markdown)
+            result = await process_single_image(
+                img, 
+                page_num=i + 1, 
+                previous_page_markdown=last_page_markdown,
+                previous_page_image_path=last_page_image_path
+            )
             if result:
                 valid_results.append(result)
                 last_page_markdown = result.content
+                last_page_image_path = img  # Store current image as previous for next iteration
     else:
         # Create tasks for concurrent processing
         tasks = [

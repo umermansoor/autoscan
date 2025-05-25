@@ -97,6 +97,7 @@ class LlmModel:
         """
         Log the LLM call details to a structured file.
         """
+    
         if not self._save_llm_calls:
             return
 
@@ -108,16 +109,25 @@ class LlmModel:
 
         # Construct formatted user prompt
         user_prompt_lines = []
+        image_index_in_prompt = 0 # Counter for images in the prompt
         for item in user_prompt_content:
             if item.get("type") == "text":
                 user_prompt_lines.append(item.get("text", ""))
             elif item.get("type") == "image_url":
+                image_index_in_prompt += 1
+                image_descriptor = "Current Page Image" # Default descriptor
+                if image_index_in_prompt == 1:
+                    image_descriptor = "Current Page Image"
+                elif image_index_in_prompt == 2:
+                    # This assumes the second image in the prompt list is the previous page's image
+                    image_descriptor = "Previous Page Image"
+                
                 url_data = item.get("image_url", {}).get("url", "")
                 if isinstance(url_data, str) and url_data.startswith("data:image"):
                     base64_str = url_data.split(",", 1)[-1]
-                    user_prompt_lines.append(f"[Image Data (last 50 chars): ...{base64_str[-50:]}]")
+                    user_prompt_lines.append(f"[{image_descriptor} (last 50 chars): ...{base64_str[-50:]}]")
                 else:
-                    user_prompt_lines.append(f"[Image URL: {url_data}]")
+                    user_prompt_lines.append(f"[{image_descriptor} URL: {url_data}]")
         formatted_user_prompt = "\n".join(user_prompt_lines)
 
         # Construct the full log entry
@@ -128,9 +138,9 @@ class LlmModel:
             system_prompt,  # Assumes system_prompt has its own correct newlines
             "User Prompt:",
             formatted_user_prompt, # Assumes formatted_user_prompt has its own correct newlines
-            f"{'Error' if is_error else 'Assistant Response'}:",
+            f"{'Error' if is_error else '\nAssistant Response'}:",
             response_or_error,  # Assumes response_or_error has its own correct newlines
-            "\n\n\n------------------------END-----------------------------\n\n\n"
+            "\n\n----------------------END LLM INTERACTION---------------------------\n\n"
         ]
         log_entry = "\n".join(log_lines) + "\n"  # Ensure a trailing newline for the whole entry
 
@@ -139,50 +149,6 @@ class LlmModel:
                 f.write(log_entry)
         except Exception as e:
             logger.error(f"Failed to write LLM call to log file: {e}")
-
-    def _maybe_log_debug_messages(self, messages: List[Dict[str, Any]]) -> None:
-        """
-        Log messages at DEBUG level if the logger is configured accordingly.
-
-        Args:
-            messages (List[Dict[str, Any]]): The messages to log.
-        """
-        if not logger.isEnabledFor(logging.DEBUG):
-            return
-
-        output_file_path = os.path.join(os.getcwd(), "output", "output.txt")
-        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-
-        for msg in messages:
-            role = msg.get("role", "unknown").capitalize()
-            content = msg.get("content")
-            log_message = f"{role}:"
-
-            # The content can be a string or a list of content items.
-            if isinstance(content, list):
-                for item in content:
-                    if item.get("type") == "text":
-                        text = item.get("text")
-                        log_message += f"\n{text}"
-                    elif item.get("type") == "image_url":
-                        url = item.get("image_url", {}).get("url", "")
-                        if url.startswith("data:image"):
-                            base64_str = url.split(",", 1)[1]
-                            preview = f"{base64_str[:100]}...{base64_str[-10:]}"
-                            log_message += f"\n[IMAGE BASE64] {preview}"
-                        else:
-                            log_message += f"\n[IMAGE URL] {url}"
-            else:
-                log_message += f"\n{content}"
-
-            logger.debug(log_message)
-
-            try:
-                with open(output_file_path, "a") as output_file:
-                    output_file.write(f"\n\n<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>\n\n")
-                    output_file.write(log_message + "\n")
-            except Exception as e:
-                logger.error(f"Failed to write to file: {e}")
 
     def _calculate_cost(self, usage) -> float:
         """
@@ -234,161 +200,109 @@ class LlmModel:
         tokens = encoding.encode(text)
         last_tokens = tokens[-n:]
         return encoding.decode(last_tokens)
-
+    
     async def image_to_markdown(
         self,
         image_path: str,
         previous_page_markdown: Optional[str] = None,
         user_instructions: Optional[str] = None,
         previous_page_image_path: Optional[str] = None,
-        page_number: Optional[int] = None, # Added page_number
+        page_number: Optional[int] = None,
     ) -> ModelResult:
-        """
-        Generate a Markdown representation of a PDF page from an image.
-
-        Args:
-            image_path (str): Path to the image file of the PDF page.
-            previous_page_markdown (Optional[str]): Markdown of the previous page (for formatting context).
-            user_instructions (Optional[str]): Additional instructions from the user.
-            previous_page_image_path (Optional[str]): Path to the image file of the previous PDF page.
-            page_number (Optional[int]): The current page number being processed.
-
-        Returns:
-            ModelResult: The generated Markdown and token usage details.
-        """
+        """Generate a Markdown representation of a PDF page from an image."""
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image path does not exist: {image_path}")
 
-        logger.debug(f"Converting image {image_path} to markdown")
         try:
             base64_image = image_to_base64(image_path)
         except Exception as e:
-            raise LLMProcessingError(
-                f"Failed to convert image to base64: {str(e)}"
-            ) from e
+            raise LLMProcessingError(f"Failed to convert image to base64: {e}") from e
 
+        # ---- 1. current-page prompt ----------------------------------------
         user_content: List[Dict[str, Any]] = [
-            {
-                "type": "text",
-                "text": (
-                    "Convert the following image to markdown."
-                )
+            {"type": "text", "text": "Convert the following image to markdown."},
+            {"type": "image_url",
+             "image_url": {"url": f"data:image/png;base64,{base64_image}"}
             },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/png;base64,{base64_image}"
-                }
-            }
         ]
 
-        # Provide previous page context if available.
+        # ---- 2. previous-page context (if any) ------------------------------
         if previous_page_markdown:
-            if self._accuracy == "high":
-                context_md = previous_page_markdown
-                intro = (
-                    "Here is the converted markdown and image of the previous page to provide you context and to help you maintain consistency in the output.\n"
-                    "Do not change or alter this content; ensure that the final output has no page breaks."
-                )
-                if previous_page_image_path:
-                    if not os.path.exists(previous_page_image_path):
-                        logger.warning(f"Previous page image path does not exist: {previous_page_image_path}")
-                    else:
-                        try:
-                            base64_previous_image = image_to_base64(previous_page_image_path)
-                            user_content.append(
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/png;base64,{base64_previous_image}"
-                                    }
-                                }
-                            )
-                            user_content.append(
-                                {
-                                    "type": "text",
-                                    "text": "This is the image of the previous page."
-                                }
-                            )
-                        except Exception as e:
-                            logger.error(f"Failed to convert previous page image to base64: {str(e)}")
-
-            else:
-                context_md = self._get_last_n_tokens(previous_page_markdown, 100)
-                intro = (
-                    "Here is the converted markdown of the last few words from the previous page to provide you context and to help you maintain consistency in the output.\n"
-                    "Do not change or alter this content; ensure that the final output has no page breaks."
-                )
-
+            # 2a. short introduction
             user_content.append({
                 "type": "text",
-                "text": f"{intro}\n<!-- PAGE SEPARATOR -->\n{context_md}",
+                "text": (
+                    "Here is the previous page (image + markdown) so you can "
+                    "maintain style consistency. Do NOT re-emit that content."
+                ),
             })
 
-        # If there are additional user instructions, include them.
+            # 2b. previous-page image (raise if path invalid)
+            print("previous_page_image_path:", previous_page_image_path)
+            if previous_page_image_path:
+                print("HEREEEEE")
+                if previous_page_image_path and not os.path.exists(previous_page_image_path):
+                    raise FileNotFoundError(f"Previous page image does not exist: {previous_page_image_path}")
+                try:
+                    base64_prev = image_to_base64(previous_page_image_path)
+                except Exception as e:
+                    raise LLMProcessingError(
+                        f"Failed to convert previous page image to base64: {e}"
+                    ) from e
+
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{base64_prev}"}
+                })
+                user_content.append({
+                    "type": "text",
+                    "text": "This is the image of the previous page."
+                })
+
+            # 2c. full previous-page markdown (or tail tokens—see note below)
+            user_content.append({
+                "type": "text",
+                "text": f"<!-- PAGE SEPARATOR -->\n{previous_page_markdown}"
+            })
+
+        # ---- 3. any ad-hoc user instructions --------------------------------
         if user_instructions:
             user_content.append({"type": "text", "text": user_instructions})
 
+        # ---- 4. construct & send messages -----------------------------------
         system_prompt = self._system_prompt
-
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content}
+            {"role": "user", "content": user_content},
         ]
 
-        # Log messages if DEBUG level is enabled
-        self._maybe_log_debug_messages(messages)
-
         try:
-            response = await acompletion(
-                model=self._model_name,
-                messages=messages,
-            )
-
-            # Extract relevant parts of the LLM response
-            raw_content = response.choices[0].message.content.strip()
-            content = self._strip_code_fences(raw_content)
-
+            response = await acompletion(model=self._model_name, messages=messages)
+            raw = response.choices[0].message.content.strip()
+            content = self._strip_code_fences(raw)
             usage = response.usage
-            total_cost = self._calculate_cost(usage)
+            cost = self._calculate_cost(usage)
 
-            # Log the assistant's response if DEBUG level is enabled
-            self._maybe_log_debug_messages([
-                {"role": "assistant", "content": content}
-            ])
-
-            # Log successful response if enabled
             if self._save_llm_calls:
                 self._log_llm_call_to_file(
-                    page_number=page_number,
-                    system_prompt=system_prompt, # System prompt remains the same
-                    user_prompt_content=user_content, # User content remains the same
-                    response_or_error=content
+                    page_number, system_prompt, user_content, content
                 )
 
             logger.debug(
                 "Tokens prompt=%s completion=%s cost=%s",
-                usage.prompt_tokens,
-                usage.completion_tokens,
-                total_cost
+                usage.prompt_tokens, usage.completion_tokens, cost
             )
-
             return ModelResult(
                 content=content,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
-                cost=total_cost
+                cost=cost,
             )
+
         except Exception as err:
-            # Log error if enabled
             if self._save_llm_calls:
                 self._log_llm_call_to_file(
-                    page_number=page_number,
-                    system_prompt=system_prompt,
-                    user_prompt_content=user_content,
-                    response_or_error=str(err),
-                    is_error=True
+                    page_number, system_prompt, user_content, str(err), is_error=True
                 )
-            raise LLMProcessingError(
-                f"Image to Markdown LLM call failed: {err}"
-            ) from err
+            raise LLMProcessingError(f"Image-to-Markdown LLM call failed: {err}") from err
+
