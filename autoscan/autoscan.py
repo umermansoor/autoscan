@@ -183,7 +183,7 @@ async def _process_images_async(
 
     context = asyncio.Semaphore(concurrency)
 
-    async def process_single_image(image_path: str, page_num: int, previous_page_markdown: Optional[str] = None, previous_page_image_path: Optional[str] = None):
+    async def process_single_image(image_path: str, page_num: int, previous_page_markdown: Optional[str] = None):
         async with context:
             logger.info(f"🔄 Processing page {page_num} of {len(pdf_page_images)}: {os.path.basename(image_path)}")
             try:
@@ -191,7 +191,6 @@ async def _process_images_async(
                     image_path,
                     previous_page_markdown=previous_page_markdown,
                     user_instructions=user_instructions,
-                    previous_page_image_path=previous_page_image_path,
                     page_number=page_num
                 )
                 
@@ -212,19 +211,16 @@ async def _process_images_async(
         logger.debug("Starting sequential processing (with previous page context)")
         valid_results = []
         last_page_markdown = None
-        last_page_image_path = None
         for i, img in enumerate(pdf_page_images):
             page_num = i + 1
             result = await process_single_image(
                 img, 
                 page_num=page_num, 
-                previous_page_markdown=last_page_markdown,
-                previous_page_image_path=last_page_image_path
+                previous_page_markdown=last_page_markdown
             )
             if result:
                 valid_results.append(result)
                 last_page_markdown = result.content
-                last_page_image_path = img
                 logger.debug(f"Sequential: Page {page_num} processed, result stored for next page context")
     else:
         logger.debug("Starting concurrent processing (pages processed independently)")

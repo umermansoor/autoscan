@@ -235,7 +235,6 @@ Log Created: {datetime.datetime.now().isoformat()}
         image_path: str,
         previous_page_markdown: Optional[str] = None,
         user_instructions: Optional[str] = None,
-        previous_page_image_path: Optional[str] = None,
         page_number: Optional[int] = None,
     ) -> ModelResult:
         """Generate a Markdown representation of a PDF page from an image."""
@@ -263,35 +262,14 @@ Log Created: {datetime.datetime.now().isoformat()}
         if previous_page_markdown and self._accuracy == "high":
             logger.debug(f"🔗 {page_str}: Adding previous page context ({len(previous_page_markdown)} chars)")
             
-            # High accuracy: Full previous page markdown + previous page image
+            # High accuracy: Full previous page markdown (no image to avoid confusion)
             context_md = previous_page_markdown
             intro = (
-                "Here is the previous page (image + markdown) so you can "
+                "Here is the previous page markdown so you can "
                 "maintain style consistency. Do NOT re-emit that content."
             )
             
-            # 2b. previous-page image (only in high accuracy mode)
-            if previous_page_image_path:
-                logger.debug(f"🖼️  {page_str}: Adding previous page image: {os.path.basename(previous_page_image_path)}")
-                if previous_page_image_path and not os.path.exists(previous_page_image_path):
-                    raise FileNotFoundError(f"Previous page image does not exist: {previous_page_image_path}")
-                try:
-                    base64_prev = image_to_base64(previous_page_image_path)
-                except Exception as e:
-                    raise LLMProcessingError(
-                        f"Failed to convert previous page image to base64: {e}"
-                    ) from e
-
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{base64_prev}"}
-                })
-                user_content.append({
-                    "type": "text",
-                    "text": "This is the image of the previous page."
-                })
-
-            # Add the context markdown
+            # Add the context markdown only (removing previous page image to prevent duplication)
             user_content.append({
                 "type": "text",
                 "text": f"{intro}\n<!-- PAGE SEPARATOR -->\n{context_md}"

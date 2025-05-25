@@ -186,7 +186,7 @@ async def test_process_images_async_sequential():
     images = ["p1.png", "p2.png", "p3.png"]
     calls = []
 
-    async def fake_image_to_markdown(image_path, previous_page_markdown=None, user_instructions=None, previous_page_image_path=None, page_number=None):
+    async def fake_image_to_markdown(image_path, previous_page_markdown=None, user_instructions=None, page_number=None):
         calls.append(previous_page_markdown)
         return ModelResult(
             content=f"md_{image_path}", prompt_tokens=1, completion_tokens=1, cost=0.0
