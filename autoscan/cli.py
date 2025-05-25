@@ -14,7 +14,6 @@ async def _process_file(
     instructions: str | None = None,
     save_llm_calls: bool = False, # Added save_llm_calls
 ) -> None:
-    logging.info(f"Processing file: {pdf_path}")
     await autoscan(
         pdf_path=pdf_path,
         model_name=model,

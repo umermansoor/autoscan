@@ -210,11 +210,15 @@ class LlmModel:
         page_number: Optional[int] = None,
     ) -> ModelResult:
         """Generate a Markdown representation of a PDF page from an image."""
+        page_str = f"Page {page_number}" if page_number is not None else "Unknown page"
+        
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image path does not exist: {image_path}")
 
+        logger.debug(f"🖼️  {page_str}: Converting image to base64: {os.path.basename(image_path)}")
         try:
             base64_image = image_to_base64(image_path)
+            logger.debug(f"📁 {page_str}: Image encoded to base64 ({len(base64_image)} chars)")
         except Exception as e:
             raise LLMProcessingError(f"Failed to convert image to base64: {e}") from e
 
@@ -228,6 +232,7 @@ class LlmModel:
 
         # ---- 2. previous-page context (if any) ------------------------------
         if previous_page_markdown:
+            logger.debug(f"🔗 {page_str}: Adding previous page context ({len(previous_page_markdown)} chars)")
             # 2a. short introduction
             user_content.append({
                 "type": "text",
@@ -238,9 +243,8 @@ class LlmModel:
             })
 
             # 2b. previous-page image (raise if path invalid)
-            print("previous_page_image_path:", previous_page_image_path)
             if previous_page_image_path:
-                print("HEREEEEE")
+                logger.debug(f"🖼️  {page_str}: Adding previous page image: {os.path.basename(previous_page_image_path)}")
                 if previous_page_image_path and not os.path.exists(previous_page_image_path):
                     raise FileNotFoundError(f"Previous page image does not exist: {previous_page_image_path}")
                 try:
@@ -267,6 +271,7 @@ class LlmModel:
 
         # ---- 3. any ad-hoc user instructions --------------------------------
         if user_instructions:
+            logger.debug(f"📝 {page_str}: Adding user instructions ({len(user_instructions)} chars)")
             user_content.append({"type": "text", "text": user_instructions})
 
         # ---- 4. construct & send messages -----------------------------------
@@ -276,6 +281,10 @@ class LlmModel:
             {"role": "user", "content": user_content},
         ]
 
+        # Log the request details
+        page_str = f"Page {page_number}" if page_number is not None else "Unknown page"
+        logger.debug(f"🔍 {page_str}: Sending request to {self._model_name}")
+        
         try:
             response = await acompletion(model=self._model_name, messages=messages)
             raw = response.choices[0].message.content.strip()
@@ -283,15 +292,19 @@ class LlmModel:
             usage = response.usage
             cost = self._calculate_cost(usage)
 
+            # Enhanced logging with page information
+            logger.debug(
+                f"✨ {page_str}: LLM response received - "
+                f"tokens(in/out)={usage.prompt_tokens}/{usage.completion_tokens}, "
+                f"cost=${cost:.4f}, "
+                f"content_length={len(content)} chars"
+            )
+
             if self._save_llm_calls:
                 self._log_llm_call_to_file(
                     page_number, system_prompt, user_content, content
                 )
 
-            logger.debug(
-                "Tokens prompt=%s completion=%s cost=%s",
-                usage.prompt_tokens, usage.completion_tokens, cost
-            )
             return ModelResult(
                 content=content,
                 prompt_tokens=usage.prompt_tokens,
@@ -300,6 +313,7 @@ class LlmModel:
             )
 
         except Exception as err:
+            logger.error(f"🚨 {page_str}: LLM call failed - {err}")
             if self._save_llm_calls:
                 self._log_llm_call_to_file(
                     page_number, system_prompt, user_content, str(err), is_error=True

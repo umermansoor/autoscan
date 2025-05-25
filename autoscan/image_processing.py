@@ -8,7 +8,10 @@ from .config import PDF2ImageConversionConfig
 
 def pdf_to_images(pdf_path: str, temp_folder: str) -> Optional[List[str]]:
     try:
-        logging.debug(f"Converting PDF {pdf_path} to images in {temp_folder}")
+        logging.debug(f"Converting PDF to images: {pdf_path}")
+        logging.debug(f"Output folder: {temp_folder}")
+        logging.debug(f"Using config: DPI={PDF2ImageConversionConfig.DPI}, format={PDF2ImageConversionConfig.FORMAT}, threads={PDF2ImageConversionConfig.NUM_THREADS}")
+        
         image_paths = convert_from_path(
             pdf_path,
             output_folder=temp_folder,
@@ -18,7 +21,11 @@ def pdf_to_images(pdf_path: str, temp_folder: str) -> Optional[List[str]]:
             dpi=PDF2ImageConversionConfig.DPI,
             use_pdftocairo=PDF2ImageConversionConfig.USE_PDFTOCAIRO,
             thread_count=PDF2ImageConversionConfig.NUM_THREADS)
-        logging.debug(f"Created {len(image_paths)} images")
+        
+        logging.debug(f"Successfully created {len(image_paths)} page images")
+        for i, path in enumerate(image_paths, 1):
+            logging.debug(f"Page {i}: {path}")
+        
         return image_paths
     except Exception as e:
         logging.error(f"Error converting PDF to images: {e}")
