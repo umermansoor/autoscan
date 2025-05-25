@@ -142,15 +142,6 @@ asyncio.run(main())
 
 ## Model Performance Comparison
 
-AutoScan has been tested extensively with both GPT-4o and Gemini 2.0 Flash models. Here's a performance comparison based on comprehensive testing:
-
-| Metric | GPT-4o | Gemini 2.0 Flash | Winner |
-|--------|--------|------------------|---------|
-| **Speed** | 14.0s avg | 5.2s avg | 🥇 Gemini (2.7x faster) |
-| **Quality** | Excellent | Excellent | 🤝 Tie |
-| **Token Usage** | 3,518 avg | 4,968 avg | 🥇 GPT-4o (29% fewer) |
-| **Reliability** | 100% | 100% | 🤝 Tie |
-
 ### Model Recommendations
 
 **Use Gemini 2.0 Flash for**:
