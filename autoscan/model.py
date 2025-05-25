@@ -66,9 +66,8 @@ class LlmModel:
                     content = content.lstrip()
                     break
             else:
-                # If no language tag found, only strip leading newlines/whitespace from the very beginning
-                content = content.lstrip('\n\r\t ')
-       
+                # If no language tag is found, strip only leading newlines (\n and \r) while preserving spaces and tabs.
+                content = content.lstrip('\n\r')
         return content
 
     @property
