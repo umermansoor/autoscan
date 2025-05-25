@@ -22,5 +22,5 @@ async def test_process_file_passes_accuracy():
 def test_get_env_var_for_model():
     assert get_env_var_for_model('openai/gpt-4o') == 'OPENAI_API_KEY'
     assert get_env_var_for_model('anthropic/claude') == 'ANTHROPIC_API_KEY'
-    assert get_env_var_for_model('gemini/gemini-pro') == 'GOOGLE_API_KEY'
+    assert get_env_var_for_model('gemini/gemini-pro') == 'GEMINI_API_KEY'
     assert get_env_var_for_model('unknown/model') is None

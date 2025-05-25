@@ -6,7 +6,7 @@ MODEL_ENV_VARS = {
     "anthropic": "ANTHROPIC_API_KEY",
     "claude": "ANTHROPIC_API_KEY",
     "google": "GOOGLE_API_KEY",
-    "gemini": "GOOGLE_API_KEY",
+    "gemini": "GEMINI_API_KEY",
 }
 
 

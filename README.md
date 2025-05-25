@@ -58,7 +58,7 @@ Depending on the model provider you choose, set the appropriate environment vari
 
 - **OpenAI**: `OPENAI_API_KEY`
 - **Anthropic (Claude)**: `ANTHROPIC_API_KEY`
-- **Google Gemini**: `GOOGLE_API_KEY` or `GEMINI_API_KEY` if using Google AI Studio (e.g.   `gemini/gemini-2.0-flash`)
+- **Google Gemini**: `GEMINI_API_KEY` (for `gemini/` models) or `GOOGLE_API_KEY` (for `google/` models)
 
 **macOS/Linux example**:
 
