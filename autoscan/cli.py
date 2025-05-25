@@ -22,8 +22,9 @@ async def _process_file(
         user_instructions=instructions,
         save_llm_calls=save_llm_calls,
         temp_dir=temp_dir,
-        cleanup_temp=False if temp_dir else True,  # Don't cleanup if user specified temp dir
+        cleanup_temp=cleanup_temp,  # Use the pre-defined variable for clarity
     )
+    cleanup_temp = False if temp_dir else True  # Don't cleanup if user specified temp dir
 
 async def _run(
     pdf_path: str | None = None,
