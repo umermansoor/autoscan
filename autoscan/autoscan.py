@@ -45,9 +45,10 @@ async def autoscan(
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
     """
     images = None
+    temp_dir_obj = None
     try:
         # Prepare temporary directory for storing intermediate files
-        temp_directory, _ = _create_temp_dir(temp_dir, cleanup_temp)
+        temp_directory, temp_dir_obj = _create_temp_dir(temp_dir, cleanup_temp)
 
         # Retrieve or download the PDF
         local_path = await get_or_download_file(pdf_path, temp_directory)
@@ -104,34 +105,8 @@ async def autoscan(
         llm_processing_time = (datetime.now() - llm_processing_start).total_seconds()
         logger.debug(f"LLM processing completed in {llm_processing_time:.2f} seconds")
 
-        # New logic for joining markdown pages
-        if not aggregated_markdown:
-            markdown_content = ""
-        else:
-            # First, handle any potential "---PAGE BREAK---" markers within page content itself.
-            # This is a safeguard; current prompts don't request this marker.
-            cleaned_pages = [page.replace("---PAGE BREAK---", "") for page in aggregated_markdown]
-
-            # Strip whitespace from each page and filter out pages that become empty
-            # after cleaning and stripping. Preserve leading whitespace for indentation.
-            valid_pages = [page.rstrip() for page in cleaned_pages if page.strip()]
-
-            if not valid_pages:
-                markdown_content = ""
-            else:
-                markdown_content_parts = [valid_pages[0]]
-                for i in range(1, len(valid_pages)):
-                    prev_page_md_stripped = valid_pages[i-1]
-                    current_page_md_stripped = valid_pages[i]
-
-                    # Condition for single newline: previous ends like a table row, current starts like one.
-                    if prev_page_md_stripped.endswith("|") and current_page_md_stripped.startswith("|"):
-                        # Join with a single newline to continue the table
-                        markdown_content_parts.append("\n" + current_page_md_stripped)
-                    else:
-                        # Default join with two newlines for separate blocks
-                        markdown_content_parts.append("\n\n" + current_page_md_stripped)
-                markdown_content = "".join(markdown_content_parts)
+        # Join markdown pages
+        markdown_content = _join_markdown_pages(aggregated_markdown)
 
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
@@ -143,9 +118,10 @@ async def autoscan(
             raise MarkdownFileWriteError(f"Failed to write markdown file: {output_filename}")
 
         # Calculate averages for better insights
-        avg_prompt_tokens = total_prompt_tokens / len(aggregated_markdown) if aggregated_markdown else 0
-        avg_completion_tokens = total_completion_tokens / len(aggregated_markdown) if aggregated_markdown else 0
-        avg_cost_per_page = total_cost / len(aggregated_markdown) if aggregated_markdown else 0
+        num_pages = len(aggregated_markdown) if aggregated_markdown else 1  # Avoid division by zero
+        avg_prompt_tokens = total_prompt_tokens / num_pages
+        avg_completion_tokens = total_completion_tokens / num_pages
+        avg_cost_per_page = total_cost / num_pages
 
         summary = "\n".join(
             [
@@ -178,10 +154,14 @@ async def autoscan(
             accuracy=accuracy,
         )
     finally:
-        # Clean up temp files if requested
+        # Clean up temp files if requested and images were created
         if cleanup_temp and images:
             logger.debug(f"Cleaning up {len(images)} temporary image files...")
             await asyncio.to_thread(_cleanup_temp_files, images)
+        
+        # Clean up temp directory if it was auto-created
+        if temp_dir_obj:
+            temp_dir_obj.cleanup()
 
 
 async def _process_images_async(
@@ -328,3 +308,35 @@ def _cleanup_temp_files(images: List[str]):
             logger.warning(f"❌ Failed to delete temporary image '{img}': {e}")
     
     logger.debug(f"Cleanup completed: {cleaned_count} files deleted, {failed_count} failed")
+
+def _join_markdown_pages(aggregated_markdown: List[str]) -> str:
+    """
+    Join markdown pages with appropriate spacing.
+    
+    Args:
+        aggregated_markdown: List of markdown content from each page
+        
+    Returns:
+        Combined markdown content
+    """
+    if not aggregated_markdown:
+        return ""
+    
+    # Clean pages by removing any "---PAGE BREAK---" markers and stripping whitespace
+    cleaned_pages = [page.replace("---PAGE BREAK---", "").rstrip() for page in aggregated_markdown]
+    valid_pages = [page for page in cleaned_pages if page.rstrip()]
+    
+    if not valid_pages:
+        return ""
+    
+    # Join pages with appropriate spacing
+    result_parts = [valid_pages[0]]
+    for i in range(1, len(valid_pages)):
+        prev_page = valid_pages[i-1]
+        current_page = valid_pages[i]
+        
+        # Use single newline for table continuations, double newline otherwise
+        separator = "\n" if prev_page.endswith("|") and current_page.startswith("|") else "\n\n"
+        result_parts.append(separator + current_page)
+    
+    return "".join(result_parts)

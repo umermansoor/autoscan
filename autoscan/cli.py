@@ -28,7 +28,7 @@ async def _process_file(
 async def _run(
     pdf_path: str | None = None,
     model: str = "openai/gpt-4o",
-    accuracy: str = "high",  # Changed default to "high"
+    accuracy: str = "high",
     instructions: str | None = None,
     save_llm_calls: bool = False,
     temp_dir: str | None = None,

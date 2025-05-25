@@ -8,7 +8,7 @@ from autoscan.utils.env import get_env_var_for_model
 async def test_process_file_passes_accuracy():
     called = {}
 
-    async def fake_autoscan(pdf_path, model_name="openai/gpt-4o", accuracy="medium", user_instructions=None, save_llm_calls=False):
+    async def fake_autoscan(pdf_path, model_name="openai/gpt-4o", accuracy="medium", user_instructions=None, save_llm_calls=False, temp_dir=None, cleanup_temp=True):
         called['accuracy'] = accuracy
         called['model'] = model_name
 
