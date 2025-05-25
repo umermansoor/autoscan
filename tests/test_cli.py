@@ -8,7 +8,7 @@ from autoscan.utils.env import get_env_var_for_model
 async def test_process_file_passes_accuracy():
     called = {}
 
-    async def fake_autoscan(pdf_path, model_name="openai/gpt-4o", accuracy="medium", user_instructions=None):
+    async def fake_autoscan(pdf_path, model_name="openai/gpt-4o", accuracy="medium", user_instructions=None, save_llm_calls=False, temp_dir=None, cleanup_temp=True):
         called['accuracy'] = accuracy
         called['model'] = model_name
 
@@ -22,5 +22,5 @@ async def test_process_file_passes_accuracy():
 def test_get_env_var_for_model():
     assert get_env_var_for_model('openai/gpt-4o') == 'OPENAI_API_KEY'
     assert get_env_var_for_model('anthropic/claude') == 'ANTHROPIC_API_KEY'
-    assert get_env_var_for_model('gemini/gemini-pro') == 'GOOGLE_API_KEY'
+    assert get_env_var_for_model('gemini/gemini-pro') == 'GEMINI_API_KEY'
     assert get_env_var_for_model('unknown/model') is None

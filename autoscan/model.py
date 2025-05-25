@@ -1,6 +1,7 @@
 import os
 import logging
 from typing import List, Dict, Any, Optional
+import datetime
 
 import litellm
 from litellm import acompletion
@@ -18,14 +19,15 @@ logger = logging.getLogger(__name__)
 class LlmModel:
     """
     A model class that converts a PDF page (provided as an image) into Markdown
-    using an LLM. It can maintain formatting consistency with previously 
+    using an LLM. It can maintain formatting consistency with previously
     processed pages.
     """
 
     def __init__(
         self,
         model_name: str = "openai/gpt-4o",
-        accuracy: str = "medium"
+        accuracy: str = "medium",
+        save_llm_calls: bool = False
     ):
         """
         Initialize the LLM model interface.
@@ -33,26 +35,39 @@ class LlmModel:
         Args:
             model_name (str): The model name to use. Defaults to "openai/gpt-4o".
             accuracy (str): An accuracy level descriptor. Defaults to "medium".
+            save_llm_calls (bool): Whether to save LLM calls to a file. Defaults to False.
         """
         self._model_name = model_name
         self._accuracy = accuracy
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
+        self._save_llm_calls = save_llm_calls
+        self._log_file_path = None  # Will be set when first log call is made
         ensure_env_for_model(model_name)
 
     @staticmethod
     def _strip_code_fences(content: str) -> str:
         """
         Remove enclosing triple backticks and optional language tags if the 
-        entire string is fenced. 
+        entire string is fenced. Preserves internal whitespace/indentation.
         """
-        content = content.strip()
+        content = content.rstrip()
         if content.startswith("```") and content.endswith("```"):
-            content = content.removeprefix("```").removesuffix("```").strip()
+            # Remove opening and closing code fences
+            content = content.removeprefix("```").removesuffix("```")
+            
+            # Remove trailing whitespace only
+            content = content.rstrip()
+            
+            # Check for language tags at the beginning and remove them
             for lang_tag in ("markdown", "md"):
                 if content.startswith(lang_tag):
                     content = content[len(lang_tag):]
+                    # Only strip leading whitespace from the language tag line, preserve content indentation
+                    content = content.lstrip()
                     break
-            content = content.strip()
+            else:
+                # If no language tag is found, strip only leading newlines (\n and \r) while preserving spaces and tabs.
+                content = content.lstrip('\n\r')
         return content
 
     @property
@@ -82,49 +97,86 @@ class LlmModel:
         """
         self._system_prompt = prompt
 
-    def _maybe_log_debug_messages(self, messages: List[Dict[str, Any]]) -> None:
+    def _log_llm_call_to_file(
+        self,
+        page_number: Optional[int],
+        system_prompt: str,
+        user_prompt_content: List[Dict[str, Any]],
+        response_or_error: str,
+        is_error: bool = False
+    ) -> None:
         """
-        Log messages at DEBUG level if the logger is configured accordingly.
-
-        Args:
-            messages (List[Dict[str, Any]]): The messages to log.
+        Log the LLM call details to a structured file.
         """
-        if not logger.isEnabledFor(logging.DEBUG):
+    
+        if not self._save_llm_calls:
             return
 
-        output_file_path = os.path.join(os.getcwd(), "output", "output.txt")
-        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+        # Create timestamped log file path if not already set
+        if self._log_file_path is None:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_filename = f"llm_calls_{self._accuracy}_{timestamp}.txt"
+            self._log_file_path = os.path.join(os.getcwd(), "logs", log_filename)
+            os.makedirs(os.path.dirname(self._log_file_path), exist_ok=True)
+            
+            # Write header to new file
+            header = f"""=== AUTOSCAN LLM CALL LOG ===
+Accuracy Mode: {self._accuracy.upper()}
+Model: {self._model_name}
+Log Created: {datetime.datetime.now().isoformat()}
+================================
 
-        for msg in messages:
-            role = msg.get("role", "unknown").capitalize()
-            content = msg.get("content")
-            log_message = f"{role}:"
+"""
+            with open(self._log_file_path, "w", encoding="utf-8") as f:
+                f.write(header)
 
-            # The content can be a string or a list of content items.
-            if isinstance(content, list):
-                for item in content:
-                    if item.get("type") == "text":
-                        text = item.get("text")
-                        log_message += f"\n{text}"
-                    elif item.get("type") == "image_url":
-                        url = item.get("image_url", {}).get("url", "")
-                        if url.startswith("data:image"):
-                            base64_str = url.split(",", 1)[1]
-                            preview = f"{base64_str[:100]}...{base64_str[-10:]}"
-                            log_message += f"\n[IMAGE BASE64] {preview}"
-                        else:
-                            log_message += f"\n[IMAGE URL] {url}"
-            else:
-                log_message += f"\n{content}"
+        timestamp = datetime.datetime.now().isoformat()
+        page_num_str = f"Page {page_number}" if page_number is not None else "Page N/A"
 
-            logger.debug(log_message)
+        # Construct formatted user prompt
+        user_prompt_lines = []
+        image_index_in_prompt = 0
+        for item in user_prompt_content:
+            if item.get("type") == "text":
+                user_prompt_lines.append(item.get("text", ""))
+            elif item.get("type") == "image_url":
+                image_index_in_prompt += 1
+                image_descriptor = "Current Page Image"
+                if image_index_in_prompt == 1:
+                    image_descriptor = "Current Page Image"
+                elif image_index_in_prompt == 2:
+                    image_descriptor = "Previous Page Image"
+                
+                url_data = item.get("image_url", {}).get("url", "")
+                if isinstance(url_data, str) and url_data.startswith("data:image"):
+                    base64_str = url_data.split(",", 1)[-1]
+                    user_prompt_lines.append(f"[{image_descriptor} (last 50 chars): ...{base64_str[-50:]}]")
+                else:
+                    user_prompt_lines.append(f"[{image_descriptor} URL: {url_data}]")
+        formatted_user_prompt = "\n".join(user_prompt_lines)
 
-            try:
-                with open(output_file_path, "a") as output_file:
-                    output_file.write(f"\n\n<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>\n\n")
-                    output_file.write(log_message + "\n")
-            except Exception as e:
-                logger.error(f"Failed to write to file: {e}")
+        log_lines = [
+            f"Timestamp: {timestamp}",
+            f"Page Number: {page_num_str}",
+            "System Prompt:",
+            system_prompt,
+            "User Prompt:",
+            formatted_user_prompt,
+            f"{'Error' if is_error else '\nAssistant Response'}:",
+            response_or_error,
+            "\n\n----------------------END LLM INTERACTION---------------------------\n\n"
+        ]
+        log_entry = "\n".join(log_lines) + "\n"
+
+        try:
+            with open(self._log_file_path, "a", encoding="utf-8") as f:
+                f.write(log_entry)
+        except Exception as e:
+            logger.error(f"Failed to write LLM call to log file: {e}")
+            
+    def get_log_file_path(self) -> Optional[str]:
+        """Return the path to the current log file."""
+        return self._log_file_path
 
     def _calculate_cost(self, usage) -> float:
         """
@@ -160,7 +212,7 @@ class LlmModel:
         try:
             encoding = tiktoken.encoding_for_model(model_name)
         except KeyError:
-            # fallback if model not recognized
+            # Fall back to default encoding if model not recognized
             encoding = tiktoken.get_encoding("cl100k_base")
         token_count = len(encoding.encode(content))
         logger.debug("Calculated %s tokens for model %s", token_count, model_name)
@@ -176,116 +228,106 @@ class LlmModel:
         tokens = encoding.encode(text)
         last_tokens = tokens[-n:]
         return encoding.decode(last_tokens)
-
+    
     async def image_to_markdown(
         self,
         image_path: str,
         previous_page_markdown: Optional[str] = None,
         user_instructions: Optional[str] = None,
+        page_number: Optional[int] = None,
     ) -> ModelResult:
-        """
-        Generate a Markdown representation of a PDF page from an image.
-
-        Args:
-            image_path (str): Path to the image file of the PDF page.
-            previous_page_markdown (Optional[str]): Markdown of the previous page (for formatting context).
-            user_instructions (Optional[str]): Additional instructions from the user.
-
-        Returns:
-            ModelResult: The generated Markdown and token usage details.
-        """
+        """Generate a Markdown representation of a PDF page from an image."""
+        page_str = f"Page {page_number}" if page_number is not None else "Unknown page"
+        
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image path does not exist: {image_path}")
 
-        logger.debug(f"Converting image {image_path} to markdown")
+        logger.debug(f"🖼️  {page_str}: Converting image to base64: {os.path.basename(image_path)}")
         try:
             base64_image = image_to_base64(image_path)
+            logger.debug(f"📁 {page_str}: Image encoded to base64 ({len(base64_image)} chars)")
         except Exception as e:
-            raise LLMProcessingError(
-                f"Failed to convert image to base64: {str(e)}"
-            ) from e
+            raise LLMProcessingError(f"Failed to convert image to base64: {e}") from e
 
-        user_content = [
-            {
-                "type": "text",
-                "text": (
-                    "Convert the following image to markdown."
-                )
+        # ---- 1. current-page prompt ----------------------------------------
+        user_content: List[Dict[str, Any]] = [
+            {"type": "text", "text": "Convert the following image to markdown."},
+            {"type": "image_url",
+             "image_url": {"url": f"data:image/png;base64,{base64_image}"}
             },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/png;base64,{base64_image}"
-                }
-            }
         ]
 
-        # Provide previous page context if available.
-        if previous_page_markdown:
-            if self._accuracy == "high":
-                context_md = previous_page_markdown
-                intro = (
-                    "Here is the converted markdown of the previous page to provide you context and to help you maintain consistency in the output.\n"
-                    "Do not change or alter this content; ensure that the final output has no page breaks."
-                )
-            else:
-                context_md = self._get_last_n_tokens(previous_page_markdown, 100)
-                intro = (
-                    "Here is the converted markdown of the last few words from the previous page to provide you context and to help you maintain consistency in the output.\n"
-                    "Do not change or alter this content; ensure that the final output has no page breaks."
-                )
-
+        # ---- 2. previous-page context (if any) ------------------------------
+        if previous_page_markdown and self._accuracy == "high":
+            logger.debug(f"🔗 {page_str}: Adding previous page context ({len(previous_page_markdown)} chars)")
+            
+            # High accuracy: Full previous page markdown (no image to avoid confusion)
+            context_md = previous_page_markdown
+            intro = (
+                "Here is the previous page markdown so you can "
+                "maintain style consistency. Do NOT re-emit that content."
+            )
+            
+            # Add the context markdown only (removing previous page image to prevent duplication)
             user_content.append({
                 "type": "text",
-                "text": f"{intro}\n<!-- PAGE SEPARATOR -->\n{context_md}",
+                "text": f"{intro}\n<!-- PAGE SEPARATOR -->\n{context_md}"
             })
+        elif previous_page_markdown and self._accuracy != "high":
+            # Low/Medium accuracy modes use concurrent processing and should not receive context
+            # This indicates a logic error in the calling code
+            logger.warning(f"⚠️  {page_str}: Ignoring previous page context in {self._accuracy} accuracy mode (concurrent processing)")
+            logger.debug(f"🚫 {page_str}: Previous page context is only used in high accuracy mode (sequential processing)")
 
-        # If there are additional user instructions, include them.
+        # ---- 3. any ad-hoc user instructions --------------------------------
         if user_instructions:
+            logger.debug(f"📝 {page_str}: Adding user instructions ({len(user_instructions)} chars)")
             user_content.append({"type": "text", "text": user_instructions})
 
+        # ---- 4. construct & send messages -----------------------------------
         system_prompt = self._system_prompt
-
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content}
+            {"role": "user", "content": user_content},
         ]
 
-        # Log messages if DEBUG level is enabled
-        self._maybe_log_debug_messages(messages)
-
+        # Log the request details
+        page_str = f"Page {page_number}" if page_number is not None else "Unknown page"
+        logger.debug(f"🔍 {page_str}: Sending request to {self._model_name}")
+        
         try:
-            response = await acompletion(
-                model=self._model_name,
-                messages=messages,
-            )
-
-            # Extract relevant parts of the LLM response
-            raw_content = response.choices[0].message.content.strip()
-            content = self._strip_code_fences(raw_content)
-
+            response = await acompletion(model=self._model_name, messages=messages)
+            # Preserve internal whitespace, only strip trailing
+            raw = response.choices[0].message.content.rstrip()
+            content = self._strip_code_fences(raw)
             usage = response.usage
-            total_cost = self._calculate_cost(usage)
+            cost = self._calculate_cost(usage)
 
-            # Log the assistant's response if DEBUG level is enabled
-            self._maybe_log_debug_messages([
-                {"role": "assistant", "content": content}
-            ])
-
+            # Enhanced logging with page information
             logger.debug(
-                "Tokens prompt=%s completion=%s cost=%s",
-                usage.prompt_tokens,
-                usage.completion_tokens,
-                total_cost
+                f"✨ {page_str}: LLM response received - "
+                f"tokens(in/out)={usage.prompt_tokens}/{usage.completion_tokens}, "
+                f"cost=${cost:.4f}, "
+                f"content_length={len(content)} chars"
             )
+
+            if self._save_llm_calls:
+                self._log_llm_call_to_file(
+                    page_number, system_prompt, user_content, content
+                )
 
             return ModelResult(
                 content=content,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
-                cost=total_cost
+                cost=cost,
             )
-        except Exception as err: 
-            raise LLMProcessingError(
-                f"Image to Markdown LLM call failed: {err}"
-            ) from err
+
+        except Exception as err:
+            logger.error(f"🚨 {page_str}: LLM call failed - {err}")
+            if self._save_llm_calls:
+                self._log_llm_call_to_file(
+                    page_number, system_prompt, user_content, str(err), is_error=True
+                )
+            raise LLMProcessingError(f"Image-to-Markdown LLM call failed: {err}") from err
+

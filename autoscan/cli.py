@@ -12,23 +12,30 @@ async def _process_file(
     model: str,
     accuracy: str,
     instructions: str | None = None,
+    save_llm_calls: bool = False,
+    temp_dir: str | None = None,
 ) -> None:
-    logging.info(f"Processing file: {pdf_path}")
     await autoscan(
         pdf_path=pdf_path,
         model_name=model,
         accuracy=accuracy,
         user_instructions=instructions,
+        save_llm_calls=save_llm_calls,
+        temp_dir=temp_dir,
+        cleanup_temp=cleanup_temp,  # Use the pre-defined variable for clarity
     )
+    cleanup_temp = False if temp_dir else True  # Don't cleanup if user specified temp dir
 
 async def _run(
     pdf_path: str | None = None,
     model: str = "openai/gpt-4o",
-    accuracy: str = "medium",
+    accuracy: str = "high",
     instructions: str | None = None,
+    save_llm_calls: bool = False,
+    temp_dir: str | None = None,
 ) -> None:
     if pdf_path:
-        await _process_file(pdf_path, model, accuracy, instructions)
+        await _process_file(pdf_path, model, accuracy, instructions, save_llm_calls, temp_dir)
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -42,8 +49,8 @@ def main() -> None:
     parser.add_argument(
         "--accuracy",
         type=str,
-        choices=["low", "medium", "high"],
-        default="medium",
+        choices=["low", "high"],  
+        default="high",  
         help="Conversion accuracy level",
     )
     parser.add_argument(
@@ -64,6 +71,16 @@ def main() -> None:
         choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
         help="Set the logging level",
     )
+    parser.add_argument(
+        "--save-llm-calls",
+        action="store_true",
+        help="Save LLM prompts and responses to output/output.txt",
+    )
+    parser.add_argument(
+        "--temp-dir",
+        type=str,
+        help="Directory for storing temporary images (won't be cleaned up)",
+    )
 
     args = parser.parse_args()
 
@@ -81,12 +98,21 @@ def main() -> None:
         return
 
     logging.basicConfig(level=getattr(logging, args.log_level), format="%(asctime)s - %(levelname)s - %(message)s")
+    
+    # Suppress LiteLLM logging to reduce noise
+    logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+    # Suppress HTTP request logs
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    
     asyncio.run(
         _run(
             pdf_path=args.pdf_path,
             model=args.model,
             accuracy=args.accuracy,
             instructions=args.instructions,
+            save_llm_calls=args.save_llm_calls,
+            temp_dir=args.temp_dir,
         )
     )
 
