@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import List, Dict, Any, Optional
-import datetime # Added for timestamp
+import datetime
 
 import litellm
 from litellm import acompletion
@@ -27,7 +27,7 @@ class LlmModel:
         self,
         model_name: str = "openai/gpt-4o",
         accuracy: str = "medium",
-        save_llm_calls: bool = False # Added save_llm_calls
+        save_llm_calls: bool = False
     ):
         """
         Initialize the LLM model interface.
@@ -40,7 +40,7 @@ class LlmModel:
         self._model_name = model_name
         self._accuracy = accuracy
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
-        self._save_llm_calls = save_llm_calls # Store save_llm_calls
+        self._save_llm_calls = save_llm_calls
         self._log_file_path = None  # Will be set when first log call is made
         ensure_env_for_model(model_name)
 
@@ -136,17 +136,16 @@ Log Created: {datetime.datetime.now().isoformat()}
 
         # Construct formatted user prompt
         user_prompt_lines = []
-        image_index_in_prompt = 0 # Counter for images in the prompt
+        image_index_in_prompt = 0
         for item in user_prompt_content:
             if item.get("type") == "text":
                 user_prompt_lines.append(item.get("text", ""))
             elif item.get("type") == "image_url":
                 image_index_in_prompt += 1
-                image_descriptor = "Current Page Image" # Default descriptor
+                image_descriptor = "Current Page Image"
                 if image_index_in_prompt == 1:
                     image_descriptor = "Current Page Image"
                 elif image_index_in_prompt == 2:
-                    # This assumes the second image in the prompt list is the previous page's image
                     image_descriptor = "Previous Page Image"
                 
                 url_data = item.get("image_url", {}).get("url", "")
@@ -157,19 +156,18 @@ Log Created: {datetime.datetime.now().isoformat()}
                     user_prompt_lines.append(f"[{image_descriptor} URL: {url_data}]")
         formatted_user_prompt = "\n".join(user_prompt_lines)
 
-        # Construct the full log entry
         log_lines = [
             f"Timestamp: {timestamp}",
             f"Page Number: {page_num_str}",
             "System Prompt:",
-            system_prompt,  # Assumes system_prompt has its own correct newlines
+            system_prompt,
             "User Prompt:",
-            formatted_user_prompt, # Assumes formatted_user_prompt has its own correct newlines
+            formatted_user_prompt,
             f"{'Error' if is_error else '\nAssistant Response'}:",
-            response_or_error,  # Assumes response_or_error has its own correct newlines
+            response_or_error,
             "\n\n----------------------END LLM INTERACTION---------------------------\n\n"
         ]
-        log_entry = "\n".join(log_lines) + "\n"  # Ensure a trailing newline for the whole entry
+        log_entry = "\n".join(log_lines) + "\n"
 
         try:
             with open(self._log_file_path, "a", encoding="utf-8") as f:
@@ -215,7 +213,7 @@ Log Created: {datetime.datetime.now().isoformat()}
         try:
             encoding = tiktoken.encoding_for_model(model_name)
         except KeyError:
-            # fallback if model not recognized
+            # Fall back to default encoding if model not recognized
             encoding = tiktoken.get_encoding("cl100k_base")
         token_count = len(encoding.encode(content))
         logger.debug("Calculated %s tokens for model %s", token_count, model_name)

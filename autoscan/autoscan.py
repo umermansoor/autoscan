@@ -11,7 +11,6 @@ from .types import AutoScanOutput
 from .common import get_or_download_file, write_text_to_file
 from .errors import PDFFileNotFoundError, PDFPageToImageConversionError, MarkdownFileWriteError, LLMProcessingError
 
-# Get the logger
 logger = logging.getLogger(__name__)
 
 async def autoscan(
@@ -23,7 +22,7 @@ async def autoscan(
     temp_dir: Optional[str] = None,
     cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
-    save_llm_calls: bool = False, # Added save_llm_calls
+    save_llm_calls: bool = False,
 ) -> AutoScanOutput:
     """
     Convert a PDF to markdown by:
@@ -100,8 +99,6 @@ async def autoscan(
             concurrency=concurrency,
             sequential=sequential,
             user_instructions=user_instructions,
-            # save_llm_calls is part of the model instance now, no need to pass here
-            # page_number will be handled inside _process_images_async
         )
         
         llm_processing_time = (datetime.now() - llm_processing_start).total_seconds()
@@ -193,7 +190,6 @@ async def _process_images_async(
     concurrency: Optional[int] = 10,
     sequential: bool = False,
     user_instructions: Optional[str] = None,
-    # save_llm_calls is part of the model instance
 ) -> Tuple[List[str], int, int, float]:
     """
     Process each image using the given model to extract text.
@@ -216,7 +212,7 @@ async def _process_images_async(
                     previous_page_markdown=previous_page_markdown,
                     user_instructions=user_instructions,
                     previous_page_image_path=previous_page_image_path,
-                    page_number=page_num # Pass page_number
+                    page_number=page_num
                 )
                 
                 # Log successful completion with token info
@@ -248,7 +244,7 @@ async def _process_images_async(
             if result:
                 valid_results.append(result)
                 last_page_markdown = result.content
-                last_page_image_path = img  # Store current image as previous for next iteration
+                last_page_image_path = img
                 logger.debug(f"Sequential: Page {page_num} processed, result stored for next page context")
     else:
         logger.debug("Starting concurrent processing (pages processed independently)")
