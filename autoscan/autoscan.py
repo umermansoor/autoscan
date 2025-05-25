@@ -74,12 +74,14 @@ async def autoscan(
         logger.debug(f"Generated {len(images)} page images from PDF in {pdf_conversion_time:.2f} seconds.")
 
         # Initialize the LLM
-        model = LlmModel(model_name=model_name, accuracy=accuracy, save_llm_calls=save_llm_calls) # Pass save_llm_calls
+        # Map 'medium' to 'low' for backwards compatibility
+        model_accuracy = "low" if accuracy == "medium" else accuracy
+        model = LlmModel(model_name=model_name, accuracy=model_accuracy, save_llm_calls=save_llm_calls)
         logger.info(f"Using model: {model_name} ({accuracy} accuracy)")
 
         # Process images
-        if accuracy not in {"low", "high"}:  
-            raise ValueError("accuracy must be one of 'low' or 'high'")
+        if accuracy not in {"low", "medium", "high"}:  
+            raise ValueError("accuracy must be one of 'low', 'medium', or 'high'")
 
         sequential = accuracy == "high"
         
@@ -114,8 +116,8 @@ async def autoscan(
             cleaned_pages = [page.replace("---PAGE BREAK---", "") for page in aggregated_markdown]
 
             # Strip whitespace from each page and filter out pages that become empty
-            # after cleaning and stripping.
-            valid_pages = [page.strip() for page in cleaned_pages if page.strip()]
+            # after cleaning and stripping. Preserve leading whitespace for indentation.
+            valid_pages = [page.rstrip() for page in cleaned_pages if page.strip()]
 
             if not valid_pages:
                 markdown_content = ""
@@ -175,6 +177,7 @@ async def autoscan(
             markdown=markdown_content,
             input_tokens=total_prompt_tokens,
             output_tokens=total_completion_tokens,
+            cost=total_cost,
             accuracy=accuracy,
         )
     finally:
@@ -248,19 +251,21 @@ async def _process_images_async(
                 last_page_image_path = img  # Store current image as previous for next iteration
                 logger.debug(f"Sequential: Page {page_num} processed, result stored for next page context")
     else:
-        logger.debug("Starting concurrent processing")
-        # Create tasks for concurrent processing
-        tasks = [
-            process_single_image(img, page_num=i + 1)
-            for i, img in enumerate(pdf_page_images)
-        ]
+        logger.debug("Starting concurrent processing (pages processed independently)")
+        tasks = []
+        for i, img in enumerate(pdf_page_images):
+            page_num = i + 1
+            # Concurrent processing: each page is processed independently without previous context
+            tasks.append(process_single_image(img, page_num=page_num))
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        valid_results = [r for r in results if r and not isinstance(r, Exception)]
         
-        # Log any exceptions that occurred
+        valid_results = []
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 logger.error(f"❌ Page {i + 1} failed with exception: {r}")
+            elif r:
+                valid_results.append(r)
         
         logger.info(f"Concurrent processing completed: {len(valid_results)}/{len(pdf_page_images)} pages successful")
 

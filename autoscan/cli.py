@@ -13,6 +13,7 @@ async def _process_file(
     accuracy: str,
     instructions: str | None = None,
     save_llm_calls: bool = False, # Added save_llm_calls
+    temp_dir: str | None = None,
 ) -> None:
     await autoscan(
         pdf_path=pdf_path,
@@ -20,6 +21,8 @@ async def _process_file(
         accuracy=accuracy,
         user_instructions=instructions,
         save_llm_calls=save_llm_calls, # Pass save_llm_calls
+        temp_dir=temp_dir,
+        cleanup_temp=False if temp_dir else True,  # Don't cleanup if user specified temp dir
     )
 
 async def _run(
@@ -28,9 +31,10 @@ async def _run(
     accuracy: str = "high",  # Changed default to "high"
     instructions: str | None = None,
     save_llm_calls: bool = False, # Added save_llm_calls
+    temp_dir: str | None = None,
 ) -> None:
     if pdf_path:
-        await _process_file(pdf_path, model, accuracy, instructions, save_llm_calls) # Pass save_llm_calls
+        await _process_file(pdf_path, model, accuracy, instructions, save_llm_calls, temp_dir) # Pass temp_dir
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -71,6 +75,11 @@ def main() -> None:
         action="store_true", # Makes it a boolean flag
         help="Save LLM prompts and responses to output/output.txt",
     )
+    parser.add_argument(
+        "--temp-dir",
+        type=str,
+        help="Directory for storing temporary images (won't be cleaned up)",
+    )
 
     args = parser.parse_args()
 
@@ -102,6 +111,7 @@ def main() -> None:
             accuracy=args.accuracy,
             instructions=args.instructions,
             save_llm_calls=args.save_llm_calls, # Pass save_llm_calls
+            temp_dir=args.temp_dir,
         )
     )
 

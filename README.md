@@ -93,7 +93,10 @@ autoscan --instructions "This is an invoice; use GitHub tables" path/to/your/fil
 
 ### Accuracy Levels
 
-`low`, `medium`, and `high` are supported. Higher accuracy processes pages sequentially. When using `high`, the entire previous page is sent back to the model for context, which increases token usage (cost) and runtime.
+- **`low`** and **`medium`**: Pages processed concurrently (faster). Pages are processed independently without previous page context for maximum speed.
+- **`high`**: Pages processed sequentially (slower but more accurate). The entire previous page markdown AND the previous page image are sent as context, which increases token usage (cost) and runtime but provides better formatting consistency.
+
+Note: `medium` is treated the same as `low` for backwards compatibility.
 
 ### Programmatic Example
 
@@ -152,6 +155,7 @@ E.g.
 
 ```sh
 autoscan --accuracy high --model gemini/gemini-2.0-flash --log-level DEBUG ./examples/table.pdf
+autoscan --accuracy high --model gemini/gemini-2.0-flash ./examples/table.pdf
 ```
 
 ## Testing

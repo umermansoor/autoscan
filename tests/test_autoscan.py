@@ -153,8 +153,8 @@ async def test_autoscan_with_custom_concurrency(tmp_path):
          patch("autoscan.autoscan._process_images_async", return_value=(["Page1", "Page2", "Page3"], 30, 60, 0.3)) as mock_process, \
          patch("autoscan.autoscan.write_text_to_file", return_value=str(output_dir / "sample.md")), \
          patch("os.makedirs"):
-        # Run with concurrency=2
-        result = await autoscan(pdf_path, temp_dir=str(temp_dir), output_dir=str(output_dir), concurrency=2)
+        # Run with concurrency=2 and low accuracy to ensure sequential=False
+        result = await autoscan(pdf_path, temp_dir=str(temp_dir), output_dir=str(output_dir), concurrency=2, accuracy="low")
         assert result is not None
         # Check that _process_images_async was called with concurrency=2
         mock_process.assert_called_with(
@@ -170,7 +170,7 @@ async def test_process_images_async_sequential():
     images = ["p1.png", "p2.png", "p3.png"]
     calls = []
 
-    async def fake_image_to_markdown(image_path, previous_page_markdown=None, user_instructions=None):
+    async def fake_image_to_markdown(image_path, previous_page_markdown=None, user_instructions=None, previous_page_image_path=None, page_number=None):
         calls.append(previous_page_markdown)
         return ModelResult(
             content=f"md_{image_path}", prompt_tokens=1, completion_tokens=1, cost=0.0

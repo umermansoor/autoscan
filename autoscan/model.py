@@ -41,22 +41,34 @@ class LlmModel:
         self._accuracy = accuracy
         self._system_prompt = DEFAULT_SYSTEM_PROMPT
         self._save_llm_calls = save_llm_calls # Store save_llm_calls
+        self._log_file_path = None  # Will be set when first log call is made
         ensure_env_for_model(model_name)
 
     @staticmethod
     def _strip_code_fences(content: str) -> str:
         """
         Remove enclosing triple backticks and optional language tags if the 
-        entire string is fenced. 
+        entire string is fenced. Preserves internal whitespace/indentation.
         """
-        content = content.strip()
+        content = content.rstrip()
         if content.startswith("```") and content.endswith("```"):
-            content = content.removeprefix("```").removesuffix("```").strip()
+            # Remove opening and closing code fences
+            content = content.removeprefix("```").removesuffix("```")
+            
+            # Remove trailing whitespace only
+            content = content.rstrip()
+            
+            # Check for language tags at the beginning and remove them
             for lang_tag in ("markdown", "md"):
                 if content.startswith(lang_tag):
                     content = content[len(lang_tag):]
+                    # Only strip leading whitespace from the language tag line, preserve content indentation
+                    content = content.lstrip()
                     break
-            content = content.strip()
+            else:
+                # If no language tag found, only strip leading newlines/whitespace from the very beginning
+                content = content.lstrip('\n\r\t ')
+       
         return content
 
     @property
@@ -101,8 +113,23 @@ class LlmModel:
         if not self._save_llm_calls:
             return
 
-        log_file_path = os.path.join(os.getcwd(), "output", "output.txt")
-        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+        # Create timestamped log file path if not already set
+        if self._log_file_path is None:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_filename = f"llm_calls_{self._accuracy}_{timestamp}.txt"
+            self._log_file_path = os.path.join(os.getcwd(), "logs", log_filename)
+            os.makedirs(os.path.dirname(self._log_file_path), exist_ok=True)
+            
+            # Write header to new file
+            header = f"""=== AUTOSCAN LLM CALL LOG ===
+Accuracy Mode: {self._accuracy.upper()}
+Model: {self._model_name}
+Log Created: {datetime.datetime.now().isoformat()}
+================================
+
+"""
+            with open(self._log_file_path, "w", encoding="utf-8") as f:
+                f.write(header)
 
         timestamp = datetime.datetime.now().isoformat()
         page_num_str = f"Page {page_number}" if page_number is not None else "Page N/A"
@@ -145,10 +172,14 @@ class LlmModel:
         log_entry = "\n".join(log_lines) + "\n"  # Ensure a trailing newline for the whole entry
 
         try:
-            with open(log_file_path, "a", encoding="utf-8") as f:
+            with open(self._log_file_path, "a", encoding="utf-8") as f:
                 f.write(log_entry)
         except Exception as e:
             logger.error(f"Failed to write LLM call to log file: {e}")
+            
+    def get_log_file_path(self) -> Optional[str]:
+        """Return the path to the current log file."""
+        return self._log_file_path
 
     def _calculate_cost(self, usage) -> float:
         """
@@ -231,18 +262,17 @@ class LlmModel:
         ]
 
         # ---- 2. previous-page context (if any) ------------------------------
-        if previous_page_markdown:
+        if previous_page_markdown and self._accuracy == "high":
             logger.debug(f"🔗 {page_str}: Adding previous page context ({len(previous_page_markdown)} chars)")
-            # 2a. short introduction
-            user_content.append({
-                "type": "text",
-                "text": (
-                    "Here is the previous page (image + markdown) so you can "
-                    "maintain style consistency. Do NOT re-emit that content."
-                ),
-            })
-
-            # 2b. previous-page image (raise if path invalid)
+            
+            # High accuracy: Full previous page markdown + previous page image
+            context_md = previous_page_markdown
+            intro = (
+                "Here is the previous page (image + markdown) so you can "
+                "maintain style consistency. Do NOT re-emit that content."
+            )
+            
+            # 2b. previous-page image (only in high accuracy mode)
             if previous_page_image_path:
                 logger.debug(f"🖼️  {page_str}: Adding previous page image: {os.path.basename(previous_page_image_path)}")
                 if previous_page_image_path and not os.path.exists(previous_page_image_path):
@@ -263,11 +293,16 @@ class LlmModel:
                     "text": "This is the image of the previous page."
                 })
 
-            # 2c. full previous-page markdown (or tail tokens—see note below)
+            # Add the context markdown
             user_content.append({
                 "type": "text",
-                "text": f"<!-- PAGE SEPARATOR -->\n{previous_page_markdown}"
+                "text": f"{intro}\n<!-- PAGE SEPARATOR -->\n{context_md}"
             })
+        elif previous_page_markdown and self._accuracy != "high":
+            # Low/Medium accuracy modes use concurrent processing and should not receive context
+            # This indicates a logic error in the calling code
+            logger.warning(f"⚠️  {page_str}: Ignoring previous page context in {self._accuracy} accuracy mode (concurrent processing)")
+            logger.debug(f"🚫 {page_str}: Previous page context is only used in high accuracy mode (sequential processing)")
 
         # ---- 3. any ad-hoc user instructions --------------------------------
         if user_instructions:
@@ -287,7 +322,8 @@ class LlmModel:
         
         try:
             response = await acompletion(model=self._model_name, messages=messages)
-            raw = response.choices[0].message.content.strip()
+            # Preserve internal whitespace, only strip trailing
+            raw = response.choices[0].message.content.rstrip()
             content = self._strip_code_fences(raw)
             usage = response.usage
             cost = self._calculate_cost(usage)
