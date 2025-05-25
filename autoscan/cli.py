@@ -88,6 +88,13 @@ def main() -> None:
         return
 
     logging.basicConfig(level=getattr(logging, args.log_level), format="%(asctime)s - %(levelname)s - %(message)s")
+    
+    # Suppress LiteLLM logging to reduce noise
+    logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+    # Suppress HTTP request logs
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    
     asyncio.run(
         _run(
             pdf_path=args.pdf_path,

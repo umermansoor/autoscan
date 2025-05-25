@@ -162,10 +162,12 @@ async def autoscan(
             ]
         )
         logger.info(summary)
-        logger.info(
-            f"To copy the markdown content to clipboard, run:\n"
-            f"cat {output_filename} | pbcopy"
-        )
+        
+        # Show clipboard copy command with better formatting
+        logger.info("")
+        logger.info("📋 Copy to clipboard:")
+        logger.info(f"   cat {output_filename} | pbcopy")
+        logger.info("")
 
         return AutoScanOutput(
             completion_time=completion_time,
