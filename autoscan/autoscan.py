@@ -64,7 +64,7 @@ async def autoscan(
 
         # Convert PDF to images (Each page becomes separate image)
         pdf_conversion_start = datetime.now()
-        images = await asyncio.to_thread(pdf_to_images, local_path, temp_directory)
+        images = await asyncio.to_thread(pdf_to_images, local_path, temp_directory, accuracy)
         if not images:
             raise PDFPageToImageConversionError("Failed to convert PDF pages to images.")
         

@@ -10,6 +10,7 @@ AutoScan converts PDF files into Markdown using LLMs (GPT-4o, Gemini, etc.) with
 - **Multi-language** document processing
 - **Custom instructions** for specialized output formats
 - **Multiple LLM support** via [LiteLLM](https://github.com/BerriAI/litellm)
+- **Adaptive DPI settings** (150-200 DPI) automatically optimized for accuracy level
 - **Flexible accuracy levels** (low=fast/concurrent, high=accurate/sequential)
 
 ![Example 1](assets/pdf_to_md_eg_1.png)
@@ -87,8 +88,15 @@ autoscan --instructions "This is an invoice; skip disclaimers" path/to/your/file
 
 ### Accuracy Levels
 
-- **`low`**: Pages processed concurrently (faster). Pages are processed independently without previous page context for maximum speed and slightly lower inference costs.
-- **`high`**: Pages processed sequentially (slower but more accurate). The entire previous page markdown AND the previous page image are sent as context, which increases token usage (cost) and runtime but provides better formatting consistency.
+AutoScan uses different processing strategies and image quality settings for each accuracy level:
+
+- **`low`**: Pages processed concurrently (faster). Pages are processed independently without previous page context for maximum speed and lower costs. Uses **150 DPI** for smaller file sizes and faster processing.
+- **`high`**: Pages processed sequentially (slower but more accurate). The entire previous page markdown AND the previous page image are sent as context, which increases token usage (cost) and runtime but provides better formatting consistency. Uses **200 DPI** for higher image quality and better text recognition.
+
+**DPI (Dots Per Inch) Impact:**
+- **Higher DPI** = Better text clarity and OCR accuracy, but larger files and higher costs
+- **Lower DPI** = Faster processing and lower costs, but slightly reduced quality for fine details
+- DPI automatically adjusts based on accuracy level - no manual configuration needed
 
 ### Programmatic Example
 
