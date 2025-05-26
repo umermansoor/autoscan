@@ -19,7 +19,7 @@ class ImageToMarkdownProcessor(BaseLLMProcessor):
         A class that converts a PDF page (provided as an image) into Markdown using an LLM.
 
         Args:
-            **kwargs: Additional parameters specific to the mage-to-Markdown processing.
+            **kwargs: Additional parameters specific to the image-to-Markdown processing.
         """
 
         self.pass_previous_page_context = kwargs.get("pass_previous_page_context", False)
