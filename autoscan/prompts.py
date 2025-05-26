@@ -21,5 +21,5 @@ Convert the PDF page image to clean, well-structured Markdown. Include all meani
 - **Lists**: Maintain consistent numbering and preserve exact indentation for nested items
 - **Text**: Ensure natural flow from previous page
 
-Output only the Markdown content, no explanations. Do not include delimiters like \`\`\`markdown or \`\`\`html.
+Output only the Markdown content, no explanations. Do not include delimiters like ```markdown or ```html.
 """

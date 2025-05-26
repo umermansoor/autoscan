@@ -15,6 +15,7 @@ async def _process_file(
     save_llm_calls: bool = False,
     temp_dir: str | None = None,
 ) -> None:
+    cleanup_temp = False if temp_dir else True  # Don't cleanup if user specified temp dir
     await autoscan(
         pdf_path=pdf_path,
         model_name=model,
@@ -24,7 +25,6 @@ async def _process_file(
         temp_dir=temp_dir,
         cleanup_temp=cleanup_temp,  # Use the pre-defined variable for clarity
     )
-    cleanup_temp = False if temp_dir else True  # Don't cleanup if user specified temp dir
 
 async def _run(
     pdf_path: str | None = None,
