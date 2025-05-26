@@ -19,11 +19,11 @@ async def test_autoscan_successful(tmp_path):
          patch("autoscan.autoscan.pdf_to_images", new=MagicMock(return_value=["image1.png", "image2.png"])) as mock_pdf_to_images, \
          patch("autoscan.autoscan._process_images_async", new=AsyncMock(return_value=(["Markdown Page 1", "Markdown Page 2"], 100, 200, 0.5))) as mock_process, \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value=str(output_dir / "sample.md"))) as mock_write, \
-        patch("autoscan.autoscan.LlmModel") as MockModel, \
+        patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
          patch("os.makedirs") as mock_makedirs:
 
-        # Mock the LlmModel
-        MockModel.return_value.completion = AsyncMock()
+        # Mock the ImageToMarkdownProcessor
+        MockProcessor.return_value.image_to_markdown = AsyncMock()
 
         # Run the function
         result = await autoscan(pdf_path, model_name, output_dir=str(output_dir), temp_dir=str(temp_dir))
@@ -39,7 +39,7 @@ async def test_autoscan_successful(tmp_path):
 
         # Ensure mocks were called
         mock_download.assert_called_once_with(pdf_path, str(temp_dir))
-        mock_pdf_to_images.assert_called_once_with(str(tmp_path / "sample.pdf"), str(temp_dir))
+        mock_pdf_to_images.assert_called_once_with(str(tmp_path / "sample.pdf"), str(temp_dir), "high")
         mock_process.assert_called_once()
         mock_write.assert_called_once()
         mock_makedirs.assert_called_with(str(output_dir), exist_ok=True)
@@ -80,10 +80,10 @@ async def test_autoscan_auto_created_temp_dir_cleanup(tmp_path):
          patch("autoscan.autoscan._process_images_async", new=AsyncMock(return_value=(["Markdown Page 1"], 50, 50, 0.1))), \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="sample.pdf")) as mock_write, \
          patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup, \
-         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
          patch("os.makedirs"):
-        # Mock the LlmModel
-        MockModel.return_value.completion = AsyncMock()
+        # Mock the ImageToMarkdownProcessor
+        MockProcessor.return_value.image_to_markdown = AsyncMock()
 
         # Run the function without specifying temp_dir (so it auto-creates one)
         await autoscan(pdf_path)
@@ -102,10 +102,10 @@ async def test_autoscan_user_provided_temp_dir_no_cleanup(tmp_path):
          patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
          patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup, \
-         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
          patch("os.makedirs"):
-        # Mock the LlmModel
-        MockModel.return_value.completion = AsyncMock()
+        # Mock the ImageToMarkdownProcessor
+        MockProcessor.return_value.image_to_markdown = AsyncMock()
         
         # Run with user-provided temp_dir - should not cleanup
         await autoscan(pdf_path, temp_dir=str(temp_dir))
@@ -118,15 +118,15 @@ async def test_autoscan_model_failure(tmp_path):
     pdf_path = "sample.pdf"
     temp_dir = tmp_path / "temp"
 
-    async def mock_completion(*args, **kwargs):
+    async def mock_image_to_markdown(*args, **kwargs):
         raise RuntimeError("Model failure")
 
     with patch("autoscan.autoscan.get_or_download_file", return_value=str(temp_dir / "sample.pdf")), \
          patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png"]), \
-         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
          patch("os.makedirs"):
-        model_instance = MockModel.return_value
-        model_instance.image_to_markdown_completion = mock_completion
+        model_instance = MockProcessor.return_value
+        model_instance.image_to_markdown = mock_image_to_markdown
 
         # We expect the _process_images_async to raise a LLMProcessingError
         with pytest.raises(LLMProcessingError, match="Error processing image"):
@@ -143,10 +143,10 @@ async def test_autoscan_markdown_write_failure(tmp_path):
          patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png"]), \
          patch("autoscan.autoscan._process_images_async", return_value=(["Some content"], 10, 20, 0.2)), \
          patch("autoscan.autoscan.write_text_to_file", return_value=None), \
-         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
          patch("os.makedirs"):
-        # Mock the LlmModel
-        MockModel.return_value.completion = AsyncMock()
+        # Mock the ImageToMarkdownProcessor
+        MockProcessor.return_value.image_to_markdown = AsyncMock()
         
         with pytest.raises(MarkdownFileWriteError):
             await autoscan(pdf_path, temp_dir=str(temp_dir))
@@ -163,21 +163,20 @@ async def test_autoscan_with_custom_concurrency(tmp_path):
          patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png", "image2.png", "image3.png"]) as mock_pdf_to_images, \
          patch("autoscan.autoscan._process_images_async", return_value=(["Page1", "Page2", "Page3"], 30, 60, 0.3)) as mock_process, \
          patch("autoscan.autoscan.write_text_to_file", return_value=str(output_dir / "sample.md")), \
-         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
          patch("os.makedirs"):
-        # Mock the LlmModel
-        MockModel.return_value.completion = AsyncMock()
+        # Mock the ImageToMarkdownProcessor
+        MockProcessor.return_value.image_to_markdown = AsyncMock()
         
         # Run with concurrency=2 and low accuracy to ensure sequential=False
         result = await autoscan(pdf_path, temp_dir=str(temp_dir), output_dir=str(output_dir), concurrency=2, accuracy="low")
         assert result is not None
         # Check that _process_images_async was called with concurrency=2
         mock_process.assert_called_with(
+            mock_process.call_args[0][0],  # llm_processor instance
             ["image1.png", "image2.png", "image3.png"],
-            mock_process.call_args[0][1],
             concurrency=2,
             sequential=False,
-            user_instructions=None,
         )
 
 @pytest.mark.asyncio
@@ -185,17 +184,19 @@ async def test_process_images_async_sequential():
     images = ["p1.png", "p2.png", "p3.png"]
     calls = []
 
-    async def fake_image_to_markdown(image_path, previous_page_markdown=None, user_instructions=None, page_number=None):
+    async def fake_acompletion(**kwargs):
+        image_path = kwargs.get('image_path')
+        previous_page_markdown = kwargs.get('previous_page_markdown')
         calls.append(previous_page_markdown)
         return ModelResult(
             content=f"md_{image_path}", prompt_tokens=1, completion_tokens=1, cost=0.0
         )
 
     model = MagicMock()
-    model.image_to_markdown.side_effect = fake_image_to_markdown
+    model.acompletion = AsyncMock(side_effect=fake_acompletion)
 
     result = await autoscan_module._process_images_async(
-        images, model, concurrency=2, sequential=True, user_instructions=None
+        model, images, concurrency=2, sequential=True
     )
 
     assert calls == [None, "md_p1.png", "md_p2.png"]
@@ -212,7 +213,7 @@ async def test_temp_dir_cleanup_logic(tmp_path):
          patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
          patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup_auto, \
-         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
          patch("tempfile.TemporaryDirectory") as mock_temp_dir, \
          patch("os.makedirs"):
         
@@ -222,7 +223,7 @@ async def test_temp_dir_cleanup_logic(tmp_path):
         temp_dir_instance.cleanup = MagicMock()
         mock_temp_dir.return_value = temp_dir_instance
         
-        MockModel.return_value.completion = AsyncMock()
+        MockProcessor.return_value.image_to_markdown = AsyncMock()
         
         # Run without providing temp_dir (should auto-create and cleanup)
         await autoscan(pdf_path)
@@ -238,10 +239,10 @@ async def test_temp_dir_cleanup_logic(tmp_path):
          patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
          patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup_user, \
-         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
          patch("os.makedirs"):
         
-        MockModel.return_value.completion = AsyncMock()
+        MockProcessor.return_value.image_to_markdown = AsyncMock()
         
         # Run with user-provided temp_dir (should NOT cleanup)
         await autoscan(pdf_path, temp_dir=str(user_temp_dir))
