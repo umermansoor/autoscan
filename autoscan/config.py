@@ -21,7 +21,7 @@ class PDF2ImageConversionConfig:
 class LLMConfig:
     DEFAULT_MODEL = "openai/gpt-4o"
 
-    # DELETE
+    
     @classmethod
     def get_costs_for_model(cls, model: str, input_tokens: int, completion_tokens: int) -> float:
         """
