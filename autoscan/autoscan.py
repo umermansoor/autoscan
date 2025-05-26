@@ -20,7 +20,6 @@ async def autoscan(
     user_instructions: Optional[str] = None,
     output_dir: Optional[str] = None,
     temp_dir: Optional[str] = None,
-    cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
     save_llm_calls: bool = False,
 ) -> AutoScanOutput:
@@ -37,7 +36,6 @@ async def autoscan(
     - `user_instructions` (str, optional): Additional context or instructions passed directly to the LLM.
     - `output_dir` (str, optional): Directory to store the final output Markdown file. Defaults to the current directory's "output" subfolder if not provided.
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
-    - `cleanup_temp` (bool, optional): If `True`, cleans up temporary, intermediate files upon completion. Defaults to `True`.
     - `concurrency` (int, optional): Maximum number of concurrent model calls. Defaults to 10.
     - `save_llm_calls` (bool, optional): Whether to save LLM calls to a file. Defaults to False.
 
@@ -48,7 +46,7 @@ async def autoscan(
     temp_dir_obj = None
     try:
         # Prepare temporary directory for storing intermediate files
-        temp_directory, temp_dir_obj = _create_temp_dir(temp_dir, cleanup_temp)
+        temp_directory, temp_dir_obj = _create_temp_dir(temp_dir)
 
         # Retrieve or download the PDF
         local_path = await get_or_download_file(pdf_path, temp_directory)
@@ -154,8 +152,10 @@ async def autoscan(
             accuracy=accuracy,
         )
     finally:
-        # Clean up temp files if requested and images were created
-        if cleanup_temp and images:
+        # Clean up temp files only if we created the temp directory
+        # If user provided temp_dir, they are responsible for cleanup
+        if temp_dir_obj and images:
+            # We created the temp directory, so cleanup individual files before directory cleanup
             logger.debug(f"Cleaning up {len(images)} temporary image files...")
             await asyncio.to_thread(_cleanup_temp_files, images)
         
@@ -255,14 +255,12 @@ async def _process_images_async(
     return aggregated_markdown, total_prompt_tokens, total_completion_tokens, total_cost
           
 
-def _create_temp_dir(temp_dir: Optional[str] = None, cleanup: bool = True) -> Tuple[str, Optional[tempfile.TemporaryDirectory]]:
+def _create_temp_dir(temp_dir: Optional[str] = None) -> Tuple[str, Optional[tempfile.TemporaryDirectory]]:
     """
     Creates or prepares a temporary directory.
     
     Args:
         temp_dir: An existing directory path to use. If provided, no automatic cleanup occurs.
-        cleanup: If True and no `temp_dir` is provided, create a TemporaryDirectory that
-                 is automatically deleted when the object is destroyed.
 
     Returns:
         A tuple of:
@@ -274,8 +272,8 @@ def _create_temp_dir(temp_dir: Optional[str] = None, cleanup: bool = True) -> Tu
         os.makedirs(temp_dir, exist_ok=True)
         return temp_dir, None
     else:
-        # Create a temporary directory
-        temp_dir_obj = tempfile.TemporaryDirectory(delete=cleanup)
+        # Create a temporary directory that will auto-cleanup
+        temp_dir_obj = tempfile.TemporaryDirectory(delete=True)
         temp_dir_path = temp_dir_obj.name
         os.makedirs(temp_dir_path, exist_ok=True)
         return temp_dir_path, temp_dir_obj

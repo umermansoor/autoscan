@@ -15,7 +15,6 @@ async def _process_file(
     save_llm_calls: bool = False,
     temp_dir: str | None = None,
 ) -> None:
-    cleanup_temp = False if temp_dir else True  # Don't cleanup if user specified temp dir
     await autoscan(
         pdf_path=pdf_path,
         model_name=model,
@@ -23,7 +22,6 @@ async def _process_file(
         user_instructions=instructions,
         save_llm_calls=save_llm_calls,
         temp_dir=temp_dir,
-        cleanup_temp=cleanup_temp,  # Use the pre-defined variable for clarity
     )
 
 async def _run(
@@ -79,7 +77,7 @@ def main() -> None:
     parser.add_argument(
         "--temp-dir",
         type=str,
-        help="Directory for storing temporary images (won't be cleaned up)",
+        help="Directory for storing temporary images (user is responsible for cleanup)",
     )
 
     args = parser.parse_args()

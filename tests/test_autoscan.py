@@ -71,13 +71,11 @@ async def test_autoscan_no_images_generated(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_autoscan_temp_dir_cleanup(tmp_path):
-    # Mock inputs
+async def test_autoscan_auto_created_temp_dir_cleanup(tmp_path):
+    # This test ensures that when we auto-create temp directory, cleanup occurs
     pdf_path = "sample.pdf"
-    temp_dir = tmp_path / "temp"
 
-    # Mock dependencies
-    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(temp_dir / "sample.pdf"))), \
+    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(tmp_path / "sample.pdf"))), \
          patch("autoscan.autoscan.pdf_to_images", new=MagicMock(return_value=["image1.png", "image2.png"])), \
          patch("autoscan.autoscan._process_images_async", new=AsyncMock(return_value=(["Markdown Page 1"], 50, 50, 0.1))), \
          patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="sample.pdf")) as mock_write, \
@@ -86,16 +84,16 @@ async def test_autoscan_temp_dir_cleanup(tmp_path):
          patch("os.makedirs"):
         # Mock the LlmModel
         MockModel.return_value.completion = AsyncMock()
-        
-        # Run the function
-        await autoscan(pdf_path, temp_dir=str(temp_dir), cleanup_temp=True)
-        # Ensure the cleanup function was called
+
+        # Run the function without specifying temp_dir (so it auto-creates one)
+        await autoscan(pdf_path)
+        # Ensure the cleanup function was called since we auto-created temp dir
         mock_cleanup.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_autoscan_no_cleanup(tmp_path):
-    # This test ensures that if cleanup_temp=False, _cleanup_temp_files is not called
+async def test_autoscan_user_provided_temp_dir_no_cleanup(tmp_path):
+    # This test ensures that when user provides temp_dir, _cleanup_temp_files is not called
     pdf_path = "sample.pdf"
     temp_dir = tmp_path / "temp"
 
@@ -109,7 +107,8 @@ async def test_autoscan_no_cleanup(tmp_path):
         # Mock the LlmModel
         MockModel.return_value.completion = AsyncMock()
         
-        await autoscan(pdf_path, temp_dir=str(temp_dir), cleanup_temp=False)
+        # Run with user-provided temp_dir - should not cleanup
+        await autoscan(pdf_path, temp_dir=str(temp_dir))
         mock_cleanup.assert_not_called()
 
 
@@ -201,4 +200,52 @@ async def test_process_images_async_sequential():
 
     assert calls == [None, "md_p1.png", "md_p2.png"]
     assert result[0] == ["md_p1.png", "md_p2.png", "md_p3.png"]
+
+@pytest.mark.asyncio
+async def test_temp_dir_cleanup_logic(tmp_path):
+    """Test that cleanup works correctly for both auto-created and user-provided temp dirs"""
+    pdf_path = "sample.pdf"
+    
+    # Test 1: Auto-created temp dir should trigger cleanup
+    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(tmp_path / "sample.pdf"))), \
+         patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png", "image2.png"]), \
+         patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
+         patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
+         patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup_auto, \
+         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("tempfile.TemporaryDirectory") as mock_temp_dir, \
+         patch("os.makedirs"):
+        
+        # Mock the TemporaryDirectory
+        temp_dir_instance = MagicMock()
+        temp_dir_instance.name = "/tmp/auto_created"
+        temp_dir_instance.cleanup = MagicMock()
+        mock_temp_dir.return_value = temp_dir_instance
+        
+        MockModel.return_value.completion = AsyncMock()
+        
+        # Run without providing temp_dir (should auto-create and cleanup)
+        await autoscan(pdf_path)
+        
+        # Should cleanup images and temp directory
+        mock_cleanup_auto.assert_called_once()
+        temp_dir_instance.cleanup.assert_called_once()
+    
+    # Test 2: User-provided temp dir should NOT trigger cleanup
+    user_temp_dir = tmp_path / "user_temp"
+    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(tmp_path / "sample.pdf"))), \
+         patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png", "image2.png"]), \
+         patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
+         patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
+         patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup_user, \
+         patch("autoscan.autoscan.LlmModel") as MockModel, \
+         patch("os.makedirs"):
+        
+        MockModel.return_value.completion = AsyncMock()
+        
+        # Run with user-provided temp_dir (should NOT cleanup)
+        await autoscan(pdf_path, temp_dir=str(user_temp_dir))
+        
+        # Should NOT cleanup images since user provided the directory
+        mock_cleanup_user.assert_not_called()
 
