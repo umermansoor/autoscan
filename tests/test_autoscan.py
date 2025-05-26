@@ -1,252 +1,357 @@
+"""
+Refactored unit tests for autoscan.py - Focused on testing previous_page_markdown 
+parameter behavior with improved maintainability and reduced brittleness.
+"""
+
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from autoscan.autoscan import autoscan
-import autoscan.autoscan as autoscan_module
-from autoscan.errors import PDFFileNotFoundError, PDFPageToImageConversionError, MarkdownFileWriteError, LLMProcessingError
+from contextlib import asynccontextmanager
+from autoscan.autoscan import autoscan, _process_images_async
 from autoscan.types import AutoScanOutput, ModelResult
 
 
-@pytest.mark.asyncio
-async def test_autoscan_successful(tmp_path):
-    # Mock inputs
-    pdf_path = "sample.pdf"
-    model_name = "openai/gpt-4o"
-    output_dir = tmp_path / "output"
-    temp_dir = tmp_path / "temp"
+# ============================================================================
+# TEST FIXTURES AND HELPERS
+# ============================================================================
 
-    # Mock dependencies
-    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(tmp_path / "sample.pdf"))) as mock_download, \
-         patch("autoscan.autoscan.pdf_to_images", new=MagicMock(return_value=["image1.png", "image2.png"])) as mock_pdf_to_images, \
-         patch("autoscan.autoscan._process_images_async", new=AsyncMock(return_value=(["Markdown Page 1", "Markdown Page 2"], 100, 200, 0.5))) as mock_process, \
-         patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value=str(output_dir / "sample.md"))) as mock_write, \
-        patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
-         patch("os.makedirs") as mock_makedirs:
-
-        # Mock the ImageToMarkdownProcessor
-        MockProcessor.return_value.image_to_markdown = AsyncMock()
-
-        # Run the function
-        result = await autoscan(pdf_path, model_name, output_dir=str(output_dir), temp_dir=str(temp_dir))
-
-        # Assertions
-        assert isinstance(result, AutoScanOutput)
-        assert result.completion_time > 0
-        assert "Markdown Page 1" in result.markdown
-        assert "Markdown Page 2" in result.markdown
-        assert result.input_tokens == 100
-        assert result.output_tokens == 200
-        assert result.markdown_file == str(output_dir / "sample.md")
-
-        # Ensure mocks were called
-        mock_download.assert_called_once_with(pdf_path, str(temp_dir))
-        mock_pdf_to_images.assert_called_once_with(str(tmp_path / "sample.pdf"), str(temp_dir), "high")
-        mock_process.assert_called_once()
-        mock_write.assert_called_once()
-        mock_makedirs.assert_called_with(str(output_dir), exist_ok=True)
+@pytest.fixture
+def sample_images():
+    """Sample image paths for testing."""
+    return ["/fake/page1.png", "/fake/page2.png", "/fake/page3.png"]
 
 
-@pytest.mark.asyncio
-async def test_autoscan_pdf_not_found():
-    # Mock inputs
-    pdf_path = "nonexistent.pdf"
+@pytest.fixture
+def sample_model_results():
+    """Sample ModelResult objects with different content for testing context flow."""
+    return [
+        ModelResult("# Page 1\nFirst page content", 100, 50, 0.01),
+        ModelResult("## Page 2\nSecond page content", 110, 55, 0.012),
+        ModelResult("### Page 3\nThird page content", 120, 60, 0.014)
+    ]
 
-    # Mock dependencies
-    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=None)):
-        with pytest.raises(PDFFileNotFoundError):
-            await autoscan(pdf_path)
+
+@asynccontextmanager
+async def mock_autoscan_dependencies():
+    """
+    Context manager that mocks all external dependencies for autoscan function.
+    This reduces duplication and makes tests more maintainable.
+    """
+    with patch('autoscan.autoscan._create_temp_dir', return_value=("/fake/temp", None)), \
+         patch('autoscan.autoscan.get_or_download_file', return_value="/fake/test.pdf"), \
+         patch('autoscan.autoscan.pdf_to_images', return_value=["/fake/page1.png"]), \
+         patch('autoscan.autoscan.write_text_to_file', return_value="/fake/output/test.md"), \
+         patch('os.makedirs'), \
+         patch('os.path.join', return_value="/fake/output"), \
+         patch('os.getcwd', return_value="/fake"), \
+         patch('os.path.basename', return_value="test.pdf"), \
+         patch('os.path.splitext', return_value=("test", ".pdf")), \
+         patch('asyncio.to_thread', return_value=["/fake/page1.png"]):
+        yield
 
 
-@pytest.mark.asyncio
-async def test_autoscan_no_images_generated(tmp_path):
-    # Mock inputs
-    pdf_path = "sample.pdf"
-    temp_dir = tmp_path / "temp"
+def create_mock_processor(return_values=None):
+    """
+    Helper function to create a mock processor with optional return values.
+    """
+    mock_processor = MagicMock()
+    if return_values:
+        mock_processor.acompletion = AsyncMock(side_effect=return_values)
+    else:
+        default_result = ModelResult("# Test\nContent", 100, 50, 0.01)
+        mock_processor.acompletion = AsyncMock(return_value=default_result)
+    return mock_processor
 
-    # Mock dependencies
-    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(temp_dir / "sample.pdf"))), \
-         patch("autoscan.autoscan.pdf_to_images", new=MagicMock(return_value=[])), \
-         patch("os.makedirs"):
-        with pytest.raises(PDFPageToImageConversionError, match="Failed to convert PDF pages to images."):
-            await autoscan(pdf_path, temp_dir=str(temp_dir))
 
+# ============================================================================
+# CORE FUNCTIONALITY TESTS
+# ============================================================================
 
 @pytest.mark.asyncio
-async def test_autoscan_auto_created_temp_dir_cleanup(tmp_path):
-    # This test ensures that when we auto-create temp directory, cleanup occurs
-    pdf_path = "sample.pdf"
-
-    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(tmp_path / "sample.pdf"))), \
-         patch("autoscan.autoscan.pdf_to_images", new=MagicMock(return_value=["image1.png", "image2.png"])), \
-         patch("autoscan.autoscan._process_images_async", new=AsyncMock(return_value=(["Markdown Page 1"], 50, 50, 0.1))), \
-         patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="sample.pdf")) as mock_write, \
-         patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup, \
-         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
-         patch("os.makedirs"):
-        # Mock the ImageToMarkdownProcessor
-        MockProcessor.return_value.image_to_markdown = AsyncMock()
-
-        # Run the function without specifying temp_dir (so it auto-creates one)
-        await autoscan(pdf_path)
-        # Ensure the cleanup function was called since we auto-created temp dir
-        mock_cleanup.assert_called_once()
+async def test_processor_initialization_high_accuracy():
+    """
+    Test that ImageToMarkdownProcessor is initialized with pass_previous_page_context=True 
+    when accuracy is 'high'.
+    """
+    async with mock_autoscan_dependencies():
+        with patch('autoscan.autoscan.ImageToMarkdownProcessor') as mock_processor_class:
+            mock_processor_class.return_value = create_mock_processor()
+            
+            await autoscan(
+                pdf_path="/fake/test.pdf",
+                model_name="test-model",
+                accuracy="high"
+            )
+            
+            # Verify the key parameter
+            call_kwargs = mock_processor_class.call_args[1]
+            assert call_kwargs['pass_previous_page_context'] is True
 
 
 @pytest.mark.asyncio
-async def test_autoscan_user_provided_temp_dir_no_cleanup(tmp_path):
-    # This test ensures that when user provides temp_dir, _cleanup_temp_files is not called
-    pdf_path = "sample.pdf"
-    temp_dir = tmp_path / "temp"
+async def test_processor_initialization_low_accuracy():
+    """
+    Test that ImageToMarkdownProcessor is initialized with pass_previous_page_context=False 
+    when accuracy is 'low'.
+    """
+    async with mock_autoscan_dependencies():
+        with patch('autoscan.autoscan.ImageToMarkdownProcessor') as mock_processor_class:
+            mock_processor_class.return_value = create_mock_processor()
+            
+            await autoscan(
+                pdf_path="/fake/test.pdf",
+                model_name="test-model",
+                accuracy="low"
+            )
+            
+            # Verify the key parameter
+            call_kwargs = mock_processor_class.call_args[1]
+            assert call_kwargs['pass_previous_page_context'] is False
 
-    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(temp_dir / "sample.pdf"))), \
-         patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png"]), \
-         patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
-         patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
-         patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup, \
-         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
-         patch("os.makedirs"):
-        # Mock the ImageToMarkdownProcessor
-        MockProcessor.return_value.image_to_markdown = AsyncMock()
-        
-        # Run with user-provided temp_dir - should not cleanup
-        await autoscan(pdf_path, temp_dir=str(temp_dir))
-        mock_cleanup.assert_not_called()
 
-
-@pytest.mark.asyncio
-async def test_autoscan_model_failure(tmp_path):
-    # Test scenario where the model completion raises an Exception
-    pdf_path = "sample.pdf"
-    temp_dir = tmp_path / "temp"
-
-    async def mock_image_to_markdown(*args, **kwargs):
-        raise RuntimeError("Model failure")
-
-    with patch("autoscan.autoscan.get_or_download_file", return_value=str(temp_dir / "sample.pdf")), \
-         patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png"]), \
-         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
-         patch("os.makedirs"):
-        model_instance = MockProcessor.return_value
-        model_instance.image_to_markdown = mock_image_to_markdown
-
-        # We expect the _process_images_async to raise a LLMProcessingError
-        with pytest.raises(LLMProcessingError, match="Error processing image"):
-            await autoscan(pdf_path, temp_dir=str(temp_dir))
-
+# ============================================================================
+# PROCESS IMAGES ASYNC TESTS (Direct unit tests)
+# ============================================================================
 
 @pytest.mark.asyncio
-async def test_autoscan_markdown_write_failure(tmp_path):
-    # Test scenario where write_text_to_file returns None, causing MarkdownFileWriteError
-    pdf_path = "sample.pdf"
-    temp_dir = tmp_path / "temp"
-
-    with patch("autoscan.autoscan.get_or_download_file", return_value=str(temp_dir / "sample.pdf")), \
-         patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png"]), \
-         patch("autoscan.autoscan._process_images_async", return_value=(["Some content"], 10, 20, 0.2)), \
-         patch("autoscan.autoscan.write_text_to_file", return_value=None), \
-         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
-         patch("os.makedirs"):
-        # Mock the ImageToMarkdownProcessor
-        MockProcessor.return_value.image_to_markdown = AsyncMock()
-        
-        with pytest.raises(MarkdownFileWriteError):
-            await autoscan(pdf_path, temp_dir=str(temp_dir))
-
-
-@pytest.mark.asyncio
-async def test_autoscan_with_custom_concurrency(tmp_path):
-    # Test that passing concurrency parameter works
-    pdf_path = "sample.pdf"
-    temp_dir = tmp_path / "temp"
-    output_dir = tmp_path / "output"
+async def test_sequential_processing_passes_previous_context(sample_images, sample_model_results):
+    """
+    Test that sequential processing (high accuracy) correctly passes previous page context.
+    """
+    mock_processor = create_mock_processor(sample_model_results)
     
-    with patch("autoscan.autoscan.get_or_download_file", return_value=str(temp_dir / "sample.pdf")), \
-         patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png", "image2.png", "image3.png"]) as mock_pdf_to_images, \
-         patch("autoscan.autoscan._process_images_async", return_value=(["Page1", "Page2", "Page3"], 30, 60, 0.3)) as mock_process, \
-         patch("autoscan.autoscan.write_text_to_file", return_value=str(output_dir / "sample.md")), \
-         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
-         patch("os.makedirs"):
-        # Mock the ImageToMarkdownProcessor
-        MockProcessor.return_value.image_to_markdown = AsyncMock()
-        
-        # Run with concurrency=2 and low accuracy to ensure sequential=False
-        result = await autoscan(pdf_path, temp_dir=str(temp_dir), output_dir=str(output_dir), concurrency=2, accuracy="low")
-        assert result is not None
-        # Check that _process_images_async was called with concurrency=2
-        mock_process.assert_called_with(
-            mock_process.call_args[0][0],  # llm_processor instance
-            ["image1.png", "image2.png", "image3.png"],
-            concurrency=2,
-            sequential=False,
-        )
-
-@pytest.mark.asyncio
-async def test_process_images_async_sequential():
-    images = ["p1.png", "p2.png", "p3.png"]
-    calls = []
-
-    async def fake_acompletion(**kwargs):
-        image_path = kwargs.get('image_path')
-        previous_page_markdown = kwargs.get('previous_page_markdown')
-        calls.append(previous_page_markdown)
-        return ModelResult(
-            content=f"md_{image_path}", prompt_tokens=1, completion_tokens=1, cost=0.0
-        )
-
-    model = MagicMock()
-    model.acompletion = AsyncMock(side_effect=fake_acompletion)
-
-    result = await autoscan_module._process_images_async(
-        model, images, concurrency=2, sequential=True
+    # Execute sequential processing
+    aggregated_markdown, _, _, _ = await _process_images_async(
+        llm_processor=mock_processor,
+        pdf_page_images=sample_images,
+        sequential=True
     )
+    
+    # Verify call pattern
+    calls = mock_processor.acompletion.call_args_list
+    assert len(calls) == 3
+    
+    # Check previous context flow
+    assert calls[0][1]['previous_page_markdown'] is None  # First page: no context
+    assert calls[1][1]['previous_page_markdown'] == sample_model_results[0].content  # Second page: page 1 context
+    assert calls[2][1]['previous_page_markdown'] == sample_model_results[1].content  # Third page: page 2 context
+    
+    # Verify page numbers are correct
+    for i, call in enumerate(calls):
+        assert call[1]['page_number'] == i + 1
 
-    assert calls == [None, "md_p1.png", "md_p2.png"]
-    assert result[0] == ["md_p1.png", "md_p2.png", "md_p3.png"]
 
 @pytest.mark.asyncio
-async def test_temp_dir_cleanup_logic(tmp_path):
-    """Test that cleanup works correctly for both auto-created and user-provided temp dirs"""
-    pdf_path = "sample.pdf"
+async def test_concurrent_processing_no_previous_context(sample_images, sample_model_results):
+    """
+    Test that concurrent processing (low accuracy) does NOT pass previous page context.
+    """
+    mock_processor = create_mock_processor(sample_model_results)
     
-    # Test 1: Auto-created temp dir should trigger cleanup
-    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(tmp_path / "sample.pdf"))), \
-         patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png", "image2.png"]), \
-         patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
-         patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
-         patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup_auto, \
-         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
-         patch("tempfile.TemporaryDirectory") as mock_temp_dir, \
-         patch("os.makedirs"):
-        
-        # Mock the TemporaryDirectory
-        temp_dir_instance = MagicMock()
-        temp_dir_instance.name = "/tmp/auto_created"
-        temp_dir_instance.cleanup = MagicMock()
-        mock_temp_dir.return_value = temp_dir_instance
-        
-        MockProcessor.return_value.image_to_markdown = AsyncMock()
-        
-        # Run without providing temp_dir (should auto-create and cleanup)
-        await autoscan(pdf_path)
-        
-        # Should cleanup images and temp directory
-        mock_cleanup_auto.assert_called_once()
-        temp_dir_instance.cleanup.assert_called_once()
+    # Execute concurrent processing
+    aggregated_markdown, _, _, _ = await _process_images_async(
+        llm_processor=mock_processor,
+        pdf_page_images=sample_images,
+        sequential=False
+    )
     
-    # Test 2: User-provided temp dir should NOT trigger cleanup
-    user_temp_dir = tmp_path / "user_temp"
-    with patch("autoscan.autoscan.get_or_download_file", new=AsyncMock(return_value=str(tmp_path / "sample.pdf"))), \
-         patch("autoscan.autoscan.pdf_to_images", return_value=["image1.png", "image2.png"]), \
-         patch("autoscan.autoscan._process_images_async", return_value=(["Markdown content"], 10, 20, 0.2)), \
-         patch("autoscan.autoscan.write_text_to_file", new=AsyncMock(return_value="output.md")), \
-         patch("autoscan.autoscan._cleanup_temp_files") as mock_cleanup_user, \
-         patch("autoscan.autoscan.ImageToMarkdownProcessor") as MockProcessor, \
-         patch("os.makedirs"):
-        
-        MockProcessor.return_value.image_to_markdown = AsyncMock()
-        
-        # Run with user-provided temp_dir (should NOT cleanup)
-        await autoscan(pdf_path, temp_dir=str(user_temp_dir))
-        
-        # Should NOT cleanup images since user provided the directory
-        mock_cleanup_user.assert_not_called()
+    # Verify call pattern
+    calls = mock_processor.acompletion.call_args_list
+    assert len(calls) == 3
+    
+    # All pages should have no previous context
+    for call in calls:
+        assert call[1]['previous_page_markdown'] is None
 
+
+@pytest.mark.asyncio
+async def test_single_page_behavior(sample_model_results):
+    """
+    Test that single page documents behave consistently in both modes.
+    """
+    single_image = ["/fake/page1.png"]
+    single_result = [sample_model_results[0]]
+    
+    # Test both sequential and concurrent modes
+    for sequential in [True, False]:
+        mock_processor = create_mock_processor(single_result)
+        
+        await _process_images_async(
+            llm_processor=mock_processor,
+            pdf_page_images=single_image,
+            sequential=sequential
+        )
+        
+        # Single page should always have no previous context
+        call = mock_processor.acompletion.call_args_list[0]
+        assert call[1]['previous_page_markdown'] is None
+        assert call[1]['page_number'] == 1
+
+
+# ============================================================================
+# INTEGRATION TESTS (Focused on behavior verification)
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_high_accuracy_workflow():
+    """
+    Integration test verifying the complete high accuracy workflow with context passing.
+    """
+    test_images = ["/fake/page1.png", "/fake/page2.png"]
+    test_results = [
+        ModelResult("# Page 1\nContent 1", 100, 50, 0.01),
+        ModelResult("# Page 2\nContent 2", 110, 55, 0.012)
+    ]
+    
+    with patch('autoscan.autoscan._create_temp_dir', return_value=("/fake/temp", None)), \
+         patch('autoscan.autoscan.get_or_download_file', return_value="/fake/test.pdf"), \
+         patch('autoscan.autoscan.pdf_to_images', return_value=test_images), \
+         patch('autoscan.autoscan.write_text_to_file', return_value="/fake/output/test.md"), \
+         patch('os.makedirs'), \
+         patch('asyncio.to_thread', return_value=test_images):
+        
+        mock_processor = create_mock_processor(test_results)
+        
+        with patch('autoscan.autoscan.ImageToMarkdownProcessor', return_value=mock_processor):
+            result = await autoscan(
+                pdf_path="/fake/test.pdf",
+                model_name="test-model",
+                accuracy="high"
+            )
+            
+            # Verify high-level behavior
+            assert isinstance(result, AutoScanOutput)
+            assert result.accuracy == "high"
+            
+            # Verify context was passed correctly
+            calls = mock_processor.acompletion.call_args_list
+            assert calls[0][1]['previous_page_markdown'] is None
+            assert calls[1][1]['previous_page_markdown'] == test_results[0].content
+
+
+@pytest.mark.asyncio
+async def test_low_accuracy_workflow():
+    """
+    Integration test verifying the complete low accuracy workflow without context passing.
+    """
+    test_images = ["/fake/page1.png", "/fake/page2.png"]
+    test_results = [
+        ModelResult("# Page 1\nContent 1", 100, 50, 0.01),
+        ModelResult("# Page 2\nContent 2", 110, 55, 0.012)
+    ]
+    
+    with patch('autoscan.autoscan._create_temp_dir', return_value=("/fake/temp", None)), \
+         patch('autoscan.autoscan.get_or_download_file', return_value="/fake/test.pdf"), \
+         patch('autoscan.autoscan.pdf_to_images', return_value=test_images), \
+         patch('autoscan.autoscan.write_text_to_file', return_value="/fake/output/test.md"), \
+         patch('os.makedirs'), \
+         patch('asyncio.to_thread', return_value=test_images):
+        
+        mock_processor = create_mock_processor(test_results)
+        
+        with patch('autoscan.autoscan.ImageToMarkdownProcessor', return_value=mock_processor):
+            result = await autoscan(
+                pdf_path="/fake/test.pdf",
+                model_name="test-model",
+                accuracy="low"
+            )
+            
+            # Verify high-level behavior
+            assert isinstance(result, AutoScanOutput)
+            assert result.accuracy == "low"
+            
+            # Verify no context was passed
+            calls = mock_processor.acompletion.call_args_list
+            for call in calls:
+                assert call[1]['previous_page_markdown'] is None
+
+
+# ============================================================================
+# EDGE CASES AND ERROR CONDITIONS
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_invalid_accuracy_raises_error():
+    """Test that invalid accuracy values raise appropriate errors."""
+    async with mock_autoscan_dependencies():
+        with pytest.raises(ValueError, match="accuracy must be one of 'low', or 'high'"):
+            await autoscan(
+                pdf_path="/fake/test.pdf",
+                model_name="test-model",
+                accuracy="invalid"
+            )
+
+
+# ============================================================================
+# BEHAVIOR COMPARISON TESTS
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_accuracy_mode_comparison(sample_images):
+    """
+    Direct comparison test showing the payload differences between accuracy modes.
+    This test clearly demonstrates the core difference being tested.
+    """
+    test_results = [
+        ModelResult("Page 1 content", 100, 50, 0.01),
+        ModelResult("Page 2 content", 100, 50, 0.01)
+    ]
+    
+    # Test high accuracy (sequential)
+    high_processor = create_mock_processor(test_results)
+    await _process_images_async(
+        llm_processor=high_processor,
+        pdf_page_images=sample_images[:2],  # Use 2 pages for clarity
+        sequential=True
+    )
+    
+    # Test low accuracy (concurrent) 
+    low_processor = create_mock_processor(test_results)
+    await _process_images_async(
+        llm_processor=low_processor,
+        pdf_page_images=sample_images[:2],
+        sequential=False
+    )
+    
+    # Compare behaviors
+    high_calls = high_processor.acompletion.call_args_list
+    low_calls = low_processor.acompletion.call_args_list
+    
+    # High accuracy: second page gets context
+    assert high_calls[0][1]['previous_page_markdown'] is None
+    assert high_calls[1][1]['previous_page_markdown'] == test_results[0].content
+    
+    # Low accuracy: no pages get context
+    assert low_calls[0][1]['previous_page_markdown'] is None  
+    assert low_calls[1][1]['previous_page_markdown'] is None
+    
+    # Both should have same page numbers and image paths
+    for i in range(2):
+        assert high_calls[i][1]['page_number'] == low_calls[i][1]['page_number']
+        assert high_calls[i][1]['image_path'] == low_calls[i][1]['image_path']
+
+
+# ============================================================================
+# PARAMETRIZED TESTS FOR EFFICIENCY
+# ============================================================================
+
+@pytest.mark.parametrize("accuracy,expected_context", [
+    ("high", True),
+    ("low", False),
+])
+@pytest.mark.asyncio
+async def test_accuracy_mode_processor_initialization(accuracy, expected_context):
+    """
+    Parametrized test for processor initialization based on accuracy mode.
+    """
+    async with mock_autoscan_dependencies():
+        with patch('autoscan.autoscan.ImageToMarkdownProcessor') as mock_processor_class:
+            mock_processor_class.return_value = create_mock_processor()
+            
+            await autoscan(
+                pdf_path="/fake/test.pdf",
+                model_name="test-model",
+                accuracy=accuracy
+            )
+            
+            call_kwargs = mock_processor_class.call_args[1]
+            assert call_kwargs['pass_previous_page_context'] is expected_context

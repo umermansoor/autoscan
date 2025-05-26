@@ -216,6 +216,29 @@ To run the test suite:
 pytest tests/
 ```
 
+### Integration Testing
+
+For comprehensive integration testing with real PDF files:
+
+```bash
+# Set your Gemini API key (required)
+export GEMINI_API_KEY="your_gemini_api_key_here"
+
+# Run integration tests on example PDFs
+python tests/integration/test_examples_integration.py
+```
+
+**What it does:**
+- Processes all PDF files in the `examples/` directory
+- Alternates between low and high accuracy modes for comparison  
+- Applies safety limits (max 5 files, max 15 pages/file) to control costs
+- Reports comprehensive statistics: processing time, cost, tokens, success rate
+
+**Prerequisites:**
+- Gemini API key ([get one free](https://aistudio.google.com/app/apikey))
+- PDF files in `examples/` directory (included with project)
+- Poppler installed for PDF processing
+
 ## Troubleshooting
 
 ### Common Issues
