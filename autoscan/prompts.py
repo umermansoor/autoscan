@@ -17,9 +17,10 @@ Convert the PDF page image to clean, well-structured Markdown. Include all meani
 - **Checkboxes**: Use ☐ for empty checkboxes and ☑ for checked checkboxes
 
 ## Continuity (when previous page context provided):
-- **Tables**: If continuing a table without new headers, provide only data rows (no headers or separators)
-- **Lists**: Maintain consistent numbering and preserve exact indentation for nested items
-- **Text**: Ensure natural flow from previous page
+- **Tables**: CRITICAL - If a table continues from the previous page, DO NOT repeat headers or table separators. Only provide the data rows that continue the table. NEVER add separator lines (|---|---|) when continuing a table - only provide data rows starting with |. Look for incomplete tables in the previous page context to determine if this page continues that table.
+- **Lists**: Continue numbering from where the previous page left off. Maintain consistent formatting and indentation for nested items.
+- **Text**: Ensure seamless flow by avoiding repetitive introductions or section breaks that duplicate previous page content.
+- **Page Breaks**: When content flows across pages, treat it as one continuous document. Do not restart formatting or add unnecessary breaks.
 
 Output only the Markdown content, no explanations. Do not include delimiters like ```markdown or ```html.
 """

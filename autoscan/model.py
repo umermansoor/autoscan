@@ -264,8 +264,10 @@ Log Created: {datetime.datetime.now().isoformat()}
             # High accuracy: Full previous page markdown (no image to avoid confusion)
             context_md = previous_page_markdown
             intro = (
-                "Here is the previous page markdown so you can "
-                "maintain style consistency. Do NOT re-emit that content."
+                "Here is the previous page markdown for continuity context. "
+                "IMPORTANT: Do NOT repeat any content from the previous page. "
+                "If tables CONTINUE across pages, ONLY provide data rows (NO headers, NO separators). "
+                "Ensure seamless continuation without duplicating previous content."
             )
             
             # Add the context markdown only (removing previous page image to prevent duplication)
