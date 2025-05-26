@@ -19,34 +19,19 @@ AutoScan converts PDF files into Markdown using LLMs (GPT-4o, Gemini, etc.) with
 
 ### Prerequisites
 
-**Install Poppler** (required for PDF processing):
+- **Python 3.12+** required
+- **Poppler** (for PDF processing):
+  - **macOS**: `brew install poppler`  
+  - **Linux**: `sudo apt-get install poppler-utils`  
+  - **Windows**: `choco install poppler` or `scoop install poppler`
 
-**macOS**: `brew install poppler`  
-**Linux**: `sudo apt-get install poppler-utils`  
-**Windows**: `choco install poppler` or `scoop install poppler`
+### Installation
 
-### Installation Options
-
-#### Option 1: Using Poetry (Recommended)
 ```bash
-git clone <repository-url>
+git clone https://github.com/umermansoor/autoscan.git
 cd autoscan
 poetry install
-poetry shell
-```
-
-#### Option 2: Using pip
-```bash
-git clone <repository-url>
-cd autoscan
-
-# Create and activate virtual environment (recommended)
-python -m venv autoscan-env
-source autoscan-env/bin/activate  # On Windows: autoscan-env\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-pip install -e .
+poetry shell  # Activates the virtual environment
 ```
 
 ### API Keys
@@ -78,7 +63,10 @@ autoscan examples/helloworld.pdf
 autoscan --model gemini/gemini-2.0-flash examples/table.pdf
 ```
 
-Expected output location: `output/` directory with `.md` files.
+**Expected output**: 
+- Success message with processing stats
+- Markdown files created in `output/` directory
+- Example: `output/helloworld.md` and `output/table.md`
 
 ## Usage
 
@@ -94,18 +82,13 @@ autoscan --accuracy high path/to/your/file.pdf
 autoscan --model gemini/gemini-2.0-flash path/to/your/file.pdf
 
 # Provide additional instructions for the LLM:
-autoscan --instructions "This is an invoice; use GitHub tables" path/to/your/file.pdf
-
-# Save LLM calls for debugging:
-autoscan --save-llm-calls path/to/your/file.pdf
+autoscan --instructions "This is an invoice; skip disclaimers" path/to/your/file.pdf
 ```
 
 ### Accuracy Levels
 
-- **`low`** and **`medium`**: Pages processed concurrently (faster). Pages are processed independently without previous page context for maximum speed.
+- **`low`**: Pages processed concurrently (faster). Pages are processed independently without previous page context for maximum speed and slightly lower inference costs.
 - **`high`**: Pages processed sequentially (slower but more accurate). The entire previous page markdown AND the previous page image are sent as context, which increases token usage (cost) and runtime but provides better formatting consistency.
-
-Note: `medium` is treated the same as `low` for backwards compatibility.
 
 ### Programmatic Example
 
@@ -136,7 +119,7 @@ Based on extensive testing with various document types:
 ### Model Recommendations
 
 **Use Gemini 2.0 Flash for**:
-- **Cost-effectiveness**: ~20x cheaper than GPT-4o ($0.0006 vs $0.013 for typical documents)
+- **Cost-effectiveness**: Significantly cheaper than GPT-4o for typical documents
 - **Speed**: Fast processing times (5-9 seconds vs 20+ seconds)
 - **High-volume processing**: Better for batch operations
 - **Detailed image descriptions**: Excellent at describing visual elements
@@ -171,17 +154,6 @@ async def autoscan(
     concurrency: Optional[int] = 10,
 ) -> AutoScanOutput:
 ```
-
-## Output
-
-The `autoscan` function returns an object with the following attributes:
-
-* **completion_time**: Time taken to complete the conversion.  
-* **markdown_file**: Path to the generated Markdown file.  
-* **markdown**: The aggregated Markdown content.  
-* **input_tokens**: Number of input tokens used.  
-* **output_tokens**: Number of output tokens generated.  
-* **accuracy**: The accuracy level used.
 
 ### Output Files
 
@@ -242,20 +214,19 @@ pytest tests/
 ### Common Issues
 
 **ImportError or Module Not Found**
-- Ensure you've activated your virtual environment or conda environment
-- Verify all dependencies are installed: `pip install -r requirements.txt`
+- Ensure you've **activated your virtual environment**: `poetry shell`
+- Verify installation: `poetry install`
 
 **PDF Processing Errors**
 - Make sure Poppler is correctly installed and accessible in your PATH
 - Test with: `pdftoppm -h` (should show help if Poppler is installed)
 
-**API Rate Limits**
-- Gemini: Very generous free tier limits
-- OpenAI: Check your usage at [platform.openai.com](https://platform.openai.com/usage)
-- Consider using `--accuracy low` for faster processing with concurrent requests
+**Python Version Issues**
+- Requires Python 3.12+. Check with: `python --version`
+- If using older Python, consider upgrading or using pyenv
 
 **High Costs**
-- Use Gemini models (significantly cheaper: ~$0.0006 vs $0.013 for similar documents)
+- Use Gemini models (significantly cheaper for similar documents)
 - Use `--accuracy low` to reduce token usage
 - Test with smaller documents first
 
