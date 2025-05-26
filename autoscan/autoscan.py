@@ -4,6 +4,9 @@ import logging
 from typing import List, Optional, Tuple
 from datetime import datetime
 import tempfile
+from autoscan.llm_processors.base_llm_processor import BaseLLMProcessor
+from autoscan.llm_processors.img_to_md_processor import ImageToMarkdownProcessor
+from autoscan.prompts import IMG_TO_MARKDOWN_PROMPT
 
 from .image_processing import pdf_to_images
 from .model import LlmModel
@@ -71,15 +74,17 @@ async def autoscan(
         pdf_conversion_time = (datetime.now() - pdf_conversion_start).total_seconds()
         logger.debug(f"Generated {len(images)} page images from PDF in {pdf_conversion_time:.2f} seconds.")
 
-        # Initialize the LLM
-        # Map 'medium' to 'low' for backwards compatibility
-        model_accuracy = "low" if accuracy == "medium" else accuracy
-        model = LlmModel(model_name=model_name, accuracy=model_accuracy, save_llm_calls=save_llm_calls)
-        logger.info(f"Using model: {model_name} ({accuracy} accuracy)")
-
         # Process images
-        if accuracy not in {"low", "medium", "high"}:  
-            raise ValueError("accuracy must be one of 'low', 'medium', or 'high'")
+        if accuracy not in {"low", "high"}:
+            raise ValueError("accuracy must be one of 'low', or 'high'")
+
+        # Initialize the LLM
+        llm_processor: BaseLLMProcessor = ImageToMarkdownProcessor(
+            model_name=model_name,
+            system_prompt=IMG_TO_MARKDOWN_PROMPT,
+            user_prompt=user_instructions or "",
+            pass_previous_page_context=(accuracy == "high"),
+        )
 
         sequential = accuracy == "high"
         
@@ -93,11 +98,10 @@ async def autoscan(
             total_completion_tokens,
             total_cost,
         ) = await _process_images_async(
+            llm_processor,
             images,
-            model,
             concurrency=concurrency,
             sequential=sequential,
-            user_instructions=user_instructions,
         )
         
         llm_processing_time = (datetime.now() - llm_processing_start).total_seconds()
@@ -165,11 +169,10 @@ async def autoscan(
 
 
 async def _process_images_async(
+    llm_processor: BaseLLMProcessor,
     pdf_page_images: List[str],
-    model: LlmModel,
     concurrency: Optional[int] = 10,
     sequential: bool = False,
-    user_instructions: Optional[str] = None,
 ) -> Tuple[List[str], int, int, float]:
     """
     Process each image using the given model to extract text.
@@ -187,10 +190,9 @@ async def _process_images_async(
         async with context:
             logger.info(f"🔄 Processing page {page_num} of {len(pdf_page_images)}: {os.path.basename(image_path)}")
             try:
-                result = await model.image_to_markdown(
-                    image_path,
+                result = await llm_processor.acompletion(
+                    image_path=image_path,
                     previous_page_markdown=previous_page_markdown,
-                    user_instructions=user_instructions,
                     page_number=page_num
                 )
                 
