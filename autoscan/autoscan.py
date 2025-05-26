@@ -9,7 +9,7 @@ from autoscan.llm_processors.img_to_md_processor import ImageToMarkdownProcessor
 from autoscan.prompts import IMG_TO_MARKDOWN_PROMPT
 
 from .image_processing import pdf_to_images
-from .model import LlmModel
+from .llm_processors.img_to_md_processor import ImageToMarkdownProcessor
 from .types import AutoScanOutput
 from .common import get_or_download_file, write_text_to_file
 from .errors import PDFFileNotFoundError, PDFPageToImageConversionError, MarkdownFileWriteError, LLMProcessingError
