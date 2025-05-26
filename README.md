@@ -158,7 +158,6 @@ async def autoscan(
     accuracy: str = "medium",
     user_instructions: Optional[str] = None,
     temp_dir: Optional[str] = None,
-    cleanup_temp: bool = True,
     concurrency: Optional[int] = 10,
 ) -> AutoScanOutput:
 ```
