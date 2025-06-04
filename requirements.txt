@@ -1,9 +1,7 @@
 # Core dependencies
 pdf2image>=1.17.0
 litellm==1.67.1
-openai>=1.57.0
 aiofiles>=24.1.0
-tiktoken==0.9.0
 
 # Development dependencies (optional)
 ipykernel>=6.29.5

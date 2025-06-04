@@ -178,7 +178,7 @@ Configure models and other parameters using the `autoscan` function signature:
 async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
-    accuracy: str = "medium",
+    accuracy: str = "high",
     user_instructions: Optional[str] = None,
     temp_dir: Optional[str] = None,
     concurrency: Optional[int] = 10,
