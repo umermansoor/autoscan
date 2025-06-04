@@ -67,5 +67,5 @@ Return a single, professionally formatted Markdown document that is:
 - Logically organized.
 - Visually consistent and appealing.
 
-Output only the Markdown content, no explanations. Do not include delimiters like ```markdown or ```html.
+Output only the Markdown content, NO explanations. NEVER ADD YOUR OWN COMMENTARY AS IT DAMAGES THE INTEGRITY OF THE DOCUMENT. Do not include delimiters like ```markdown or ```html.
 """
