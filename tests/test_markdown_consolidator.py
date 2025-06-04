@@ -1,42 +1,42 @@
 """
-Test suite for ContentRefiner class which is responsible
-for refining and improving Markdown content using an LLM.
-Part of AutoScan's Content Refinement feature.
+Test suite for MarkdownConsolidator class which is responsible for
+consolidating Markdown generated from individual PDF pages into a coherent document.
+Part of AutoScan's Output Polishing feature.
 """
 
 import pytest
 from unittest.mock import patch, AsyncMock
-from autoscan.llm_processors.content_refiner import ContentRefiner
+from autoscan.llm_processors.markdown_consolidator import MarkdownConsolidator
 from autoscan.types import ModelResult
 
 
 @pytest.fixture
-def refiner():
+def consolidator():
     """
-    Create a test instance of ContentRefiner with default test configuration.
+    Create a test instance of MarkdownConsolidator with default test configuration.
     """
-    return ContentRefiner(
+    return MarkdownConsolidator(
         model_name="test-model",
-        system_prompt="Clean up this markdown",
+        system_prompt="Consolidate this markdown",
         user_prompt="Make it professional",
     )
 
 
 @pytest.mark.asyncio
-async def test_acompletion_raises_on_missing_markdown_content(refiner):
+async def test_acompletion_raises_on_missing_markdown_content(consolidator):
     """
     Test that acompletion method raises ValueError when markdown_content is not provided.
     """
     with pytest.raises(ValueError, match="markdown_content must be provided"):
-        await refiner.acompletion()
+        await consolidator.acompletion()
 
 
 @pytest.mark.asyncio
-async def test_acompletion_handles_empty_content(refiner):
+async def test_acompletion_handles_empty_content(consolidator):
     """
     Test that acompletion handles empty markdown content gracefully.
     """
-    result = await refiner.acompletion(markdown_content="")
+    result = await consolidator.acompletion(markdown_content="")
     assert result.content == ""
     assert result.prompt_tokens == 0
     assert result.completion_tokens == 0
@@ -44,32 +44,32 @@ async def test_acompletion_handles_empty_content(refiner):
 
 
 @pytest.mark.asyncio
-async def test_acompletion_success(refiner):
+async def test_acompletion_success(consolidator):
     """
-    Test successful completion of content refinement.
+    Test successful completion of output polishing.
     """
     # Create a fake LLM response
-    fake_result = ModelResult("# Refined Markdown\nThis is much better!", 150, 75, 0.02)
+    fake_result = ModelResult("# Consolidated Markdown\nThis is much better!", 150, 75, 0.02)
     
     # Mock the internal LLM call method to return our fake result
-    with patch.object(refiner, '_allm_call', new_callable=AsyncMock, return_value=fake_result):
-        result = await refiner.acompletion(
-            markdown_content="# messy markdown\nthis needs refinement..."
+    with patch.object(consolidator, '_allm_call', new_callable=AsyncMock, return_value=fake_result):
+        result = await consolidator.acompletion(
+            markdown_content="# messy markdown\nthis needs consolidation..."
         )
-        # Verify that the refiner returns the expected result
+        # Verify that the consolidator returns the expected result
         assert result == fake_result
 
 
 @pytest.mark.asyncio
-async def test_acompletion_with_user_instructions(refiner):
+async def test_acompletion_with_user_instructions(consolidator):
     """
     Test that acompletion includes user instructions in the messages sent to the LLM.
     """
-    refiner.user_prompt = "Focus on table formatting"
-    fake_result = ModelResult("refined content", 100, 50, 0.01)
+    consolidator.user_prompt = "Focus on table formatting"
+    fake_result = ModelResult("consolidated content", 100, 50, 0.01)
     
-    with patch.object(refiner, '_allm_call', new_callable=AsyncMock, return_value=fake_result) as mock_call:
-        await refiner.acompletion(
+    with patch.object(consolidator, '_allm_call', new_callable=AsyncMock, return_value=fake_result) as mock_call:
+        await consolidator.acompletion(
             markdown_content="Some markdown content"
         )
         
@@ -88,7 +88,7 @@ async def test_acompletion_assembles_messages_correctly():
     user_prompt = "Focus on headers"
     markdown_content = "# Bad Header\nsome content"
     
-    refiner = ContentRefiner(
+    consolidator = MarkdownConsolidator(
         model_name="test-model",
         system_prompt=system_prompt,
         user_prompt=user_prompt,
@@ -96,8 +96,8 @@ async def test_acompletion_assembles_messages_correctly():
     
     fake_result = ModelResult("formatted content", 100, 50, 0.01)
     
-    with patch.object(refiner, '_allm_call', new_callable=AsyncMock, return_value=fake_result) as mock_call:
-        await refiner.acompletion(markdown_content=markdown_content)
+    with patch.object(consolidator, '_allm_call', new_callable=AsyncMock, return_value=fake_result) as mock_call:
+        await consolidator.acompletion(markdown_content=markdown_content)
         
         # Check the actual messages argument passed to _allm_call
         called_messages = mock_call.call_args[1]['messages']
@@ -120,7 +120,7 @@ async def test_acompletion_without_user_prompt():
     """
     Test that acompletion works correctly when no user prompt is provided.
     """
-    refiner = ContentRefiner(
+    consolidator = MarkdownConsolidator(
         model_name="test-model",
         system_prompt="Clean markdown",
         user_prompt="",  # Empty user prompt
@@ -128,8 +128,8 @@ async def test_acompletion_without_user_prompt():
     
     fake_result = ModelResult("clean content", 80, 40, 0.008)
     
-    with patch.object(refiner, '_allm_call', new_callable=AsyncMock, return_value=fake_result) as mock_call:
-        await refiner.acompletion(markdown_content="messy content")
+    with patch.object(consolidator, '_allm_call', new_callable=AsyncMock, return_value=fake_result) as mock_call:
+        await consolidator.acompletion(markdown_content="messy content")
         
         # Should only have system and user content messages, no additional instructions
         messages = mock_call.call_args[1]['messages']

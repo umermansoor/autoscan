@@ -66,4 +66,6 @@ Return a single, professionally formatted Markdown document that is:
 - Easy to read and navigate.
 - Logically organized.
 - Visually consistent and appealing.
+
+Output only the Markdown content, no explanations. Do not include delimiters like ```markdown or ```html.
 """

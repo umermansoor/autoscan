@@ -6,7 +6,7 @@ from datetime import datetime
 import tempfile
 from autoscan.llm_processors.base_llm_processor import BaseLLMProcessor
 from autoscan.llm_processors.img_to_md_processor import ImageToMarkdownProcessor
-from autoscan.llm_processors.content_refiner import ContentRefiner
+from autoscan.llm_processors.markdown_consolidator import MarkdownConsolidator
 from autoscan.prompts import IMG_TO_MARKDOWN_PROMPT, POST_PROCESSING_PROMPT
 
 from .image_processing import pdf_to_images
@@ -25,7 +25,7 @@ async def autoscan(
     temp_dir: Optional[str] = None,
     concurrency: Optional[int] = 10,
     save_llm_calls: bool = False,
-    enable_content_refinement: bool = False,
+    polish_output: bool = False,
 ) -> AutoScanOutput:
     """
     Convert a PDF to markdown by:
@@ -43,7 +43,7 @@ async def autoscan(
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
     - `concurrency` (int, optional): Maximum number of concurrent model calls. Defaults to 10.
     - `save_llm_calls` (bool, optional): Whether to save LLM calls to a file. Defaults to False.
-    - `enable_content_refinement` (bool, optional): Whether to post-process the output for improved formatting, structure, and organization. Defaults to False.
+    - `polish_output` (bool, optional): Whether to apply an additional LLM pass to improve formatting, fix broken tables, and enhance document structure. Defaults to False.
 
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
@@ -113,19 +113,19 @@ async def autoscan(
         # Join markdown pages
         markdown_content = _join_markdown_pages(aggregated_markdown)
 
-        # Post-process the markdown if requested
-        if enable_content_refinement and markdown_content.strip():
-            logger.info("✨ Content refinement enabled - post-processing markdown...")
+        # Polish the output if requested
+        if polish_output and markdown_content.strip():
+            logger.info("✨ Output polishing enabled - applying additional LLM pass to improve formatting...")
             post_processing_start = datetime.now()
             
             try:
-                post_processor = ContentRefiner(
+                markdown_consolidator = MarkdownConsolidator(
                     model_name=model_name,
                     system_prompt=POST_PROCESSING_PROMPT,
                     user_prompt=user_instructions or "",
                 )
                 
-                post_result = await post_processor.acompletion(
+                post_result = await markdown_consolidator.acompletion(
                     markdown_content=markdown_content
                 )
                 
@@ -137,16 +137,16 @@ async def autoscan(
                 
                 post_processing_time = (datetime.now() - post_processing_start).total_seconds()
                 logger.info(
-                    f"✅ Content refinement completed in {post_processing_time:.2f}s: "
+                    f"✅ Output polishing completed in {post_processing_time:.2f}s: "
                     f"tokens(in/out)={post_result.prompt_tokens}/{post_result.completion_tokens}, "
                     f"cost=${post_result.cost:.4f}"
                 )
                 
             except Exception as e:
-                logger.error(f"❌ Content refinement failed: {e}")
+                logger.error(f"❌ Output polishing failed: {e}")
                 logger.info("Proceeding with original markdown content...")
-        elif enable_content_refinement:
-            logger.warning("Content refinement requested but no content to process")
+        elif polish_output:
+            logger.warning("Output polishing requested but no content to process")
 
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
@@ -175,8 +175,8 @@ async def autoscan(
             f"  📝 Content length   : {len(markdown_content):,} characters",
         ]
         
-        if enable_content_refinement:
-            summary_lines.append(f"  ✨ Content refinement: enabled")
+        if polish_output:
+            summary_lines.append(f"  ✨ Output polishing: enabled")
         
         summary = "\n".join(summary_lines)
         logger.info(summary)
