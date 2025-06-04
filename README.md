@@ -29,6 +29,14 @@ AutoScan converts PDF files into Markdown using LLMs (GPT-4o, Gemini, etc.) with
 
 ### Installation
 
+#### Option 1: Install from PyPI (Recommended)
+
+```bash
+pip install autoscan
+```
+
+#### Option 2: Install from Source
+
 ```bash
 git clone https://github.com/umermansoor/autoscan.git
 cd autoscan
