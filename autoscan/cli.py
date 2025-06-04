@@ -14,6 +14,7 @@ async def _process_file(
     instructions: str | None = None,
     save_llm_calls: bool = False,
     temp_dir: str | None = None,
+    enable_content_refinement: bool = False,
 ) -> None:
     await autoscan(
         pdf_path=pdf_path,
@@ -22,6 +23,7 @@ async def _process_file(
         user_instructions=instructions,
         save_llm_calls=save_llm_calls,
         temp_dir=temp_dir,
+        enable_content_refinement=enable_content_refinement,
     )
 
 async def _run(
@@ -31,9 +33,10 @@ async def _run(
     instructions: str | None = None,
     save_llm_calls: bool = False,
     temp_dir: str | None = None,
+    enable_content_refinement: bool = False,
 ) -> None:
     if pdf_path:
-        await _process_file(pdf_path, model, accuracy, instructions, save_llm_calls, temp_dir)
+        await _process_file(pdf_path, model, accuracy, instructions, save_llm_calls, temp_dir, enable_content_refinement)
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -79,6 +82,11 @@ def main() -> None:
         type=str,
         help="Directory for storing temporary images (user is responsible for cleanup)",
     )
+    parser.add_argument(
+        "--enable-content-refinement",
+        action="store_true",
+        help="Enable post-processing to improve formatting and organization of the output",
+    )
 
     args = parser.parse_args()
 
@@ -111,6 +119,7 @@ def main() -> None:
             instructions=args.instructions,
             save_llm_calls=args.save_llm_calls,
             temp_dir=args.temp_dir,
+            enable_content_refinement=args.enable_content_refinement,
         )
     )
 

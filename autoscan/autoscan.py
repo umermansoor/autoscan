@@ -6,7 +6,8 @@ from datetime import datetime
 import tempfile
 from autoscan.llm_processors.base_llm_processor import BaseLLMProcessor
 from autoscan.llm_processors.img_to_md_processor import ImageToMarkdownProcessor
-from autoscan.prompts import IMG_TO_MARKDOWN_PROMPT
+from autoscan.llm_processors.content_refiner import ContentRefiner
+from autoscan.prompts import IMG_TO_MARKDOWN_PROMPT, POST_PROCESSING_PROMPT
 
 from .image_processing import pdf_to_images
 from .types import AutoScanOutput
@@ -24,12 +25,14 @@ async def autoscan(
     temp_dir: Optional[str] = None,
     concurrency: Optional[int] = 10,
     save_llm_calls: bool = False,
+    enable_content_refinement: bool = False,
 ) -> AutoScanOutput:
     """
     Convert a PDF to markdown by:
       1. Converting PDF pages into images.
       2. Using an LLM to process each page image into markdown.
       3. Aggregating all markdown pages into a single file.
+      4. Optionally post-processing for improved formatting and organization.
 
     ## Args
     - `pdf_path` (str): **Required.** Path to the input PDF file.
@@ -40,6 +43,7 @@ async def autoscan(
     - `temp_dir` (str, optional): Directory for storing temporary images. If not specified, a temporary directory will be created and cleaned automatically after processing.
     - `concurrency` (int, optional): Maximum number of concurrent model calls. Defaults to 10.
     - `save_llm_calls` (bool, optional): Whether to save LLM calls to a file. Defaults to False.
+    - `enable_content_refinement` (bool, optional): Whether to post-process the output for improved formatting, structure, and organization. Defaults to False.
 
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
@@ -109,6 +113,41 @@ async def autoscan(
         # Join markdown pages
         markdown_content = _join_markdown_pages(aggregated_markdown)
 
+        # Post-process the markdown if requested
+        if enable_content_refinement and markdown_content.strip():
+            logger.info("✨ Content refinement enabled - post-processing markdown...")
+            post_processing_start = datetime.now()
+            
+            try:
+                post_processor = ContentRefiner(
+                    model_name=model_name,
+                    system_prompt=POST_PROCESSING_PROMPT,
+                    user_prompt=user_instructions or "",
+                )
+                
+                post_result = await post_processor.acompletion(
+                    markdown_content=markdown_content
+                )
+                
+                # Update the content and token counts
+                markdown_content = post_result.content
+                total_prompt_tokens += post_result.prompt_tokens
+                total_completion_tokens += post_result.completion_tokens
+                total_cost += post_result.cost
+                
+                post_processing_time = (datetime.now() - post_processing_start).total_seconds()
+                logger.info(
+                    f"✅ Content refinement completed in {post_processing_time:.2f}s: "
+                    f"tokens(in/out)={post_result.prompt_tokens}/{post_result.completion_tokens}, "
+                    f"cost=${post_result.cost:.4f}"
+                )
+                
+            except Exception as e:
+                logger.error(f"❌ Content refinement failed: {e}")
+                logger.info("Proceeding with original markdown content...")
+        elif enable_content_refinement:
+            logger.warning("Content refinement requested but no content to process")
+
         end_time = datetime.now()
         completion_time = (end_time - start_time).total_seconds()
 
@@ -124,19 +163,22 @@ async def autoscan(
         avg_completion_tokens = total_completion_tokens / num_pages
         avg_cost_per_page = total_cost / num_pages
 
-        summary = "\n".join(
-            [
-                "🎉 AutoScan completed successfully!",
-                f"  📄 Output file      : {output_filename}",
-                f"  ⏱️  Completion time  : {completion_time:.2f} seconds",
-                f"  📊 Pages processed  : {len(aggregated_markdown)}",
-                f"  🔢 Tokens (in/out)  : {total_prompt_tokens:,}/{total_completion_tokens:,}",
-                f"  💰 Total cost      : ${total_cost:.4f}",
-                f"  📈 Avg per page     : {avg_prompt_tokens:.0f}/{avg_completion_tokens:.0f} tokens, ${avg_cost_per_page:.4f}",
-                f"  🎯 Accuracy level   : {accuracy}",
-                f"  📝 Content length   : {len(markdown_content):,} characters",
-            ]
-        )
+        summary_lines = [
+            "🎉 AutoScan completed successfully!",
+            f"  📄 Output file      : {output_filename}",
+            f"  ⏱️  Completion time  : {completion_time:.2f} seconds",
+            f"  📊 Pages processed  : {len(aggregated_markdown)}",
+            f"  🔢 Tokens (in/out)  : {total_prompt_tokens:,}/{total_completion_tokens:,}",
+            f"  💰 Total cost      : ${total_cost:.4f}",
+            f"  📈 Avg per page     : {avg_prompt_tokens:.0f}/{avg_completion_tokens:.0f} tokens, ${avg_cost_per_page:.4f}",
+            f"  🎯 Accuracy level   : {accuracy}",
+            f"  📝 Content length   : {len(markdown_content):,} characters",
+        ]
+        
+        if enable_content_refinement:
+            summary_lines.append(f"  ✨ Content refinement: enabled")
+        
+        summary = "\n".join(summary_lines)
         logger.info(summary)
         
         # Show clipboard copy command with better formatting
