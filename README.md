@@ -1,18 +1,22 @@
 # AutoScan
 
-AutoScan converts PDF files into Markdown using LLMs (GPT-4o, Gemini, etc.) with high fidelity. It's designed for complex documents like medical records, invoices, and technical papers where accuracy is critical.
+An LLM-powered library/tool to convert PDF files into Markdown using LLMs (GPT-4o, Gemini, etc.) with high fidelity. It's designed for complex documents like medical records, invoices, and technical papers where accuracy is critical. 
+
+## How It Works
+
+1. **Convert PDF to Images**: Each page of the PDF is converted into an image.
+2. **Process Images with LLM**: The images are processed by the LLM to generate Markdown.
+3. **Aggregate Markdown**: All Markdown output is combined into one file using a simple algorithm.
 
 ## Features
 
-- **High accuracy** conversion preserving tables, layouts, and formatting
-- **Image transcription** with detailed descriptions
-- **Handwriting OCR** support
-- **Multi-language** document processing
-- **Custom instructions** for specialized output formats
-- **Multiple LLM support** via [LiteLLM](https://github.com/BerriAI/litellm)
-- **Adaptive DPI settings** (150-200 DPI) automatically optimized for accuracy level
-- **Flexible accuracy levels** (low=fast/concurrent, high=accurate/sequential)
-- **Output polishing** (optional) for professional formatting via additional LLM pass
+- Converts PDFs to high-fidelity Markdown (preserves tables, layout, formatting)
+- Supports images and handwriting OCR
+- Works with multiple LLMs via [LiteLLM](https://github.com/BerriAI/litellm)
+- Handles multiple languages
+- Custom output instructions
+- Adjustable accuracy/speed
+- Optional output polishing for professional formatting
 
 ![Example 1](assets/pdf_to_md_eg_1.png)
 ![Example 2](assets/pdf_to_md_eg_2.png)
@@ -49,21 +53,19 @@ poetry shell  # Activates the virtual environment
 Set your API key based on the model you plan to use:
 
 ```bash
-# For OpenAI models (gpt-4o, etc.)
-export OPENAI_API_KEY="your_openai_key"
-
-# For Google Gemini models (recommended for cost-effectiveness)
-export GEMINI_API_KEY="your_gemini_key"
-
-# For Anthropic models
-export ANTHROPIC_API_KEY="your_anthropic_key"
+# For OpenAI (gpt-4o)
+export OPENAI_API_KEY="your_key"
+# For Gemini (recommended for lower cost)
+export GEMINI_API_KEY="your_key"
+# For Anthropic
+export ANTHROPIC_API_KEY="your_key"
 ```
 
-**Get Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/app/apikey) - free with generous rate limits!
+**Get Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/app/apikey) - free!
 
-### Verify Installation
+## Usage
 
-Test your setup with the included examples:
+### Command Line
 
 ```bash
 # Test with OpenAI GPT-4o (default)
@@ -71,176 +73,73 @@ autoscan examples/helloworld.pdf
 
 # Test with Gemini (cost-effective option)
 autoscan --model gemini/gemini-2.0-flash examples/table.pdf
+
+# Add extra LLM instructions
+autoscan --instructions "Skip disclaimers" yourfile.pdf
+
+# Polish output formatting
+autoscan --polish-output yourfile.pdf
 ```
 
-**Expected output**: 
-- Success message with processing stats
-- Markdown files created in `output/` directory
-- Example: `output/helloworld.md` and `output/table.md`
+Markdown files are saved in the `output/` directory.
 
-## Usage
-
-### Command Line Interface
-
-```bash
-autoscan path/to/your/file.pdf
-
-# Choose accuracy level (low, medium, high):
-autoscan --accuracy high path/to/your/file.pdf
-
-# Specify a model (default is `openai/gpt-4o`):
-autoscan --model gemini/gemini-2.0-flash path/to/your/file.pdf
-
-# Provide additional instructions for the LLM:
-autoscan --instructions "This is an invoice; skip disclaimers" path/to/your/file.pdf
-
-# Apply additional LLM pass to improve formatting and document structure:
-autoscan --polish-output path/to/your/file.pdf
-```
-
-### Output Polishing
-
-AutoScan includes an optional **output polishing** feature that applies an additional LLM pass to improve the formatting and presentation of the generated Markdown. When enabled with `--polish-output`, the system performs a second LLM pass that:
-
-- **Cleans up formatting inconsistencies** from the page-by-page conversion process
-- **Reconstructs broken tables** and ensures proper column alignment
-- **Merges fragmented content** that may have been split across pages
-- **Eliminates duplicate headers, footers, and page numbers**
-- **Improves document structure** with consistent heading hierarchies
-- **Restores natural text flow** by fixing fragmented sentences and paragraphs
-
-**When to use:**
-- Complex multi-page documents with tables spanning pages
-- Documents with inconsistent formatting or broken layouts
-- When you need publication-ready output with professional formatting
-- Reports, invoices, or technical documents requiring precise structure
-
-**Cost impact:** Adds one additional LLM call processing the entire document (typically 10-30% of total cost)
-
-### Accuracy Levels
-
-AutoScan uses different processing strategies and image quality settings for each accuracy level:
-
-- **`low`**: Pages processed concurrently (faster). Pages are processed independently without previous page context for maximum speed and lower costs. Uses **150 DPI** for smaller file sizes and faster processing.
-- **`high`**: Pages processed sequentially (slower but more accurate). The entire previous page markdown AND the previous page image are sent as context, which increases token usage (cost) and runtime but provides better formatting consistency. Uses **200 DPI** for higher image quality and better text recognition.
-
-**DPI (Dots Per Inch) Impact:**
-- **Higher DPI** = Better text clarity and OCR accuracy, but larger files and higher costs
-- **Lower DPI** = Faster processing and lower costs, but slightly reduced quality for fine details
-- DPI automatically adjusts based on accuracy level - no manual configuration needed
-
-### Programmatic Example
-
-You can also invoke AutoScan in your Python code:
+### API Example
 
 ```python
 import asyncio
 from autoscan.autoscan import autoscan
 
 async def main():
-    pdf_path = "path/to/your/pdf_file.pdf"
-    output = await autoscan(pdf_path)
-    print(output.markdown)
+    result = await autoscan("yourfile.pdf", model_name="gemini/gemini-2.0-flash", accuracy="high")
+    print(result.markdown)
 
 asyncio.run(main())
 ```
 
-## How It Works
 
-1. **Convert PDF to Images**: Each page of the PDF is converted into an image.
-2. **Process Images with LLM**: The images are processed by the LLM to generate Markdown.
-3. **Aggregate Markdown**: All Markdown output is combined into one file using a simple algorithm.
+## Model Comparison
 
-## Model Performance Comparison
+| Model             | Speed      | Cost      | Best For                     |
+|-------------------|------------|-----------|------------------------------|
+| Gemini 2.0 Flash  | Fastest    | Cheapest  | General, image-rich docs     |
+| GPT-4o            | Slower     | Higher    | Table-heavy, complex layouts |
 
-Based on extensive testing with various document types:
+- Use **Gemini** for most documents (fast & low cost).
+- Use **GPT-4o** for best table formatting.
 
-### Model Recommendations
-
-**Use Gemini 2.0 Flash for**:
-- **Cost-effectiveness**: Significantly cheaper than GPT-4o for typical documents
-- **Speed**: Fast processing times (5-9 seconds vs 20+ seconds)
-- **High-volume processing**: Better for batch operations
-- **Detailed image descriptions**: Excellent at describing visual elements
-
-**Use GPT-4o for**:
-- **Table formatting**: Superior table structure preservation
-- **Token efficiency**: More concise output (fewer tokens generated)
-- **Consistent formatting**: Better heading hierarchy consistency
-- **Complex layouts**: Better handling of multi-column documents
-
-### Performance Metrics (Tested)
-
-| Model | Speed | Cost | Accuracy | Best For |
-|-------|-------|------|----------|----------|
-| Gemini 2.0 Flash | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | General use, high-volume |
-| GPT-4o | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | Tables, precision |
-
-Both models achieve excellent results with 100% success rates in testing across various document types including simple text, complex multi-page documents, tables, and lists.
 
 ## Configuration
 
-Configure models and other parameters using the `autoscan` function signature:
+Call signature:
 
 ```python
 async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
     accuracy: str = "high",
-    user_instructions: Optional[str] = None,
-    temp_dir: Optional[str] = None,
-    concurrency: Optional[int] = 10,
-) -> AutoScanOutput:
+    user_instructions: str = None,
+    temp_dir: str = None,
+    concurrency: int = 10,
+) -> AutoScanOutput
 ```
 
-### Output Files
+- **Output**: Markdown in `output/`, logs in `logs/` (if `--save-llm-calls` is used).
 
-- **Markdown**: Generated in `output/` directory with same name as PDF
-- **LLM Logs** (optional): When using `--save-llm-calls`, logs are saved in `logs/` directory containing:
-  - Original prompts sent to LLM
-  - Complete responses received
-  - Useful for debugging and understanding processing
 
-## Examples
 
-Sample PDFs are available in the `examples/` directory for testing and demonstration.
 
-### Basic Usage Examples
+### Accuracy Levels
 
-```bash
-# Process a simple document (fastest, cheapest)
-autoscan --model gemini/gemini-2.0-flash --accuracy low examples/helloworld.pdf
+AutoScan uses different processing strategies and image quality settings for each accuracy level:
 
-# Process a table-heavy document (best quality)
-autoscan --accuracy high --model openai/gpt-4o examples/table.pdf
+- **`low`**: Pages processed concurrently (faster). Pages are processed independently without previous page context for maximum speed and lower costs. Uses **150 DPI** for smaller file sizes and faster processing.
+- **`high`**: Pages processed sequentially (slower but more accurate). The entire previous page markdown is sent as context, which increases token usage (cost) and runtime but provides better formatting consistency. Uses **200 DPI** for higher image quality and better text recognition.
 
-# Process with custom instructions
-autoscan --instructions "Format as GitHub-flavored markdown tables" examples/table.pdf
+**DPI (Dots Per Inch) Impact:**
+- **Higher DPI** = Better text clarity and OCR accuracy, but larger files and higher costs
+- **Lower DPI** = Faster processing and lower costs, but slightly reduced quality for fine details
+- DPI automatically adjusts based on accuracy level - no manual configuration needed
 
-# Enable output polishing for professional formatting
-autoscan --polish-output examples/table.pdf
-
-# Debug mode - save all LLM interactions
-autoscan --save-llm-calls --model gemini/gemini-2.0-flash examples/table.pdf
-```
-
-### Expected Performance
-
-- **Simple documents**: 5-20 seconds, $0.0006-$0.013
-- **Complex multi-page**: 15-60 seconds, $0.002-$0.05  
-- **Table-heavy documents**: 10-30 seconds, $0.001-$0.02
-
-## Known Issues
-
-While AutoScan achieves excellent results with 100% success rates in testing, there are some minor issues to be aware of:
-
-### Minor Issues Found
-1. **GPT-4o**: Occasional duplicate headings in output
-2. **Gemini**: Inconsistent table break handling (may add empty rows between table sections)
-3. **Both models**: Missing main headings for pure list documents
-4. **Heading Levels**: Some inconsistency between `#` and `##` for main titles
-
-These issues are cosmetic and don't affect the core functionality or data accuracy. The output remains highly usable for downstream processing.
 
 ## Testing
 
@@ -268,11 +167,6 @@ python tests/integration/test_examples_integration.py
 - Applies safety limits (max 5 files, max 15 pages/file) to control costs
 - Reports comprehensive statistics: processing time, cost, tokens, success rate
 
-**Prerequisites:**
-- Gemini API key ([get one free](https://aistudio.google.com/app/apikey))
-- PDF files in `examples/` directory (included with project)
-- Poppler installed for PDF processing
-
 ## Troubleshooting
 
 ### Common Issues
@@ -298,13 +192,6 @@ python tests/integration/test_examples_integration.py
 - Use `--accuracy low` or `medium` for concurrent processing
 - Consider Gemini 2.0 Flash for faster speeds
 - Check your internet connection for API calls
-
-### Performance Tips
-
-1. **Cost Optimization**: Use `gemini/gemini-2.0-flash` for best price/performance ratio
-2. **Speed Optimization**: Use `--accuracy low` for concurrent page processing
-3. **Quality Optimization**: Use `--accuracy high` with `openai/gpt-4o` for best results
-4. **Debugging**: Use `--save-llm-calls` to save prompts and responses for analysis
 
 ## Contributing
 
