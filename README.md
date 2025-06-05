@@ -134,7 +134,7 @@ async def autoscan(
 ) -> AutoScanOutput
 ```
 
-**Output**: Be default, output (Markdown) files are saved to `output/` directory, optional logs in `logs/` directory.
+**Output**: By default, output (Markdown) files are saved to `output/` directory, optional logs in `logs/` directory.
 
 ### Accuracy Levels
 
