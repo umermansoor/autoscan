@@ -11,7 +11,8 @@ async def _process_file(
     pdf_path: str,
     model: str,
     accuracy: str,
-    instructions: str | None = None,
+    prompt: str | None = None,
+    output_dir: str | None = None,
     save_llm_calls: bool = False,
     temp_dir: str | None = None,
     polish_output: bool = False,
@@ -20,7 +21,8 @@ async def _process_file(
         pdf_path=pdf_path,
         model_name=model,
         accuracy=accuracy,
-        user_instructions=instructions,
+        user_instructions=prompt,
+        output_dir=output_dir,
         save_llm_calls=save_llm_calls,
         temp_dir=temp_dir,
         polish_output=polish_output,
@@ -30,13 +32,14 @@ async def _run(
     pdf_path: str | None = None,
     model: str = "openai/gpt-4o",
     accuracy: str = "high",
-    instructions: str | None = None,
+    prompt: str | None = None,
+    output_dir: str | None = None,
     save_llm_calls: bool = False,
     temp_dir: str | None = None,
     polish_output: bool = False,
 ) -> None:
     if pdf_path:
-        await _process_file(pdf_path, model, accuracy, instructions, save_llm_calls, temp_dir, polish_output)
+        await _process_file(pdf_path, model, accuracy, prompt, output_dir, save_llm_calls, temp_dir, polish_output)
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -61,9 +64,14 @@ def main() -> None:
         help="Model name to use with LiteLLM",
     )
     parser.add_argument(
-        "--instructions",
+        "--prompt",
         type=str,
         help="Optional instructions passed to the LLM",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        help="Directory to save the output markdown file (defaults to ./output/)",
     )
     parser.add_argument(
         "--log-level",
@@ -75,7 +83,7 @@ def main() -> None:
     parser.add_argument(
         "--save-llm-calls",
         action="store_true",
-        help="Save LLM prompts and responses to output/output.txt",
+        help="Save LLM prompts and responses to logs/ directory",
     )
     parser.add_argument(
         "--temp-dir",
@@ -85,7 +93,7 @@ def main() -> None:
     parser.add_argument(
         "--polish-output",
         action="store_true",
-        help="Apply additional LLM pass to improve formatting, fix broken tables, and enhance document structure",
+        help="Apply additional LLM pass to improve formatting and document structure",
     )
 
     args = parser.parse_args()
@@ -116,7 +124,8 @@ def main() -> None:
             pdf_path=args.pdf_path,
             model=args.model,
             accuracy=args.accuracy,
-            instructions=args.instructions,
+            prompt=args.prompt,
+            output_dir=args.output_dir,
             save_llm_calls=args.save_llm_calls,
             temp_dir=args.temp_dir,
             polish_output=args.polish_output,

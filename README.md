@@ -74,8 +74,8 @@ autoscan examples/helloworld.pdf
 # Test with Gemini (cost-effective option)
 autoscan --model gemini/gemini-2.0-flash examples/table.pdf
 
-# Add extra LLM instructions
-autoscan --instructions "Skip disclaimers" yourfile.pdf
+# Add extra LLM prompt
+autoscan --prompt "Skip disclaimers" yourfile.pdf
 
 # Polish output formatting
 autoscan --polish-output yourfile.pdf
@@ -110,23 +110,31 @@ asyncio.run(main())
 
 ## Configuration
 
-Call signature:
+### View All CLI Options
+
+To see all available command line options:
+
+```bash
+autoscan --help
+```
+
+### API Function Signature
 
 ```python
 async def autoscan(
-    pdf_path: str,
-    model_name: str = "openai/gpt-4o",
-    accuracy: str = "high",
-    user_instructions: str = None,
-    temp_dir: str = None,
-    concurrency: int = 10,
+    pdf_path: str,                          # Required: Path to PDF file
+    model_name: str = "openai/gpt-4o",      # AI model (openai/gpt-4o, gemini/gemini-2.0-flash, etc.)
+    accuracy: str = "high",                 # Processing mode: "low" (fast) or "high" (accurate)
+    user_instructions: str = None,          # Custom instructions for the LLM
+    output_dir: str = None,                 # Output directory (defaults to ./output/)
+    temp_dir: str = None,                   # Temp directory for images (auto-created if None)
+    concurrency: int = 10,                  # Max concurrent API calls (low accuracy only)
+    save_llm_calls: bool = False,           # Save prompts/responses for debugging
+    polish_output: bool = False,            # Apply additional formatting pass
 ) -> AutoScanOutput
 ```
 
-- **Output**: Markdown in `output/`, logs in `logs/` (if `--save-llm-calls` is used).
-
-
-
+**Output**: Be default, output (Markdown) files are saved to `output/` directory, optional logs in `logs/` directory.
 
 ### Accuracy Levels
 
@@ -139,7 +147,6 @@ AutoScan uses different processing strategies and image quality settings for eac
 - **Higher DPI** = Better text clarity and OCR accuracy, but larger files and higher costs
 - **Lower DPI** = Faster processing and lower costs, but slightly reduced quality for fine details
 - DPI automatically adjusts based on accuracy level - no manual configuration needed
-
 
 ## Testing
 
