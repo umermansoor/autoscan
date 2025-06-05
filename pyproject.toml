@@ -1,9 +1,27 @@
 [tool.poetry]
 name = "autoscan"
 version = "0.1.0"
-description = "High quality document (PDF, Doc, etc.) to text conversion"
+description = "High fidelity PDF to Markdown conversion using LLMs (GPT-4o, Gemini, etc.)"
 authors = ["Umer Mansoor <umermk3@gmail.com>"]
 readme = "README.md"
+license = "MIT"
+homepage = "https://github.com/umermansoor/autoscan"
+repository = "https://github.com/umermansoor/autoscan"
+documentation = "https://github.com/umermansoor/autoscan#readme"
+keywords = ["pdf", "markdown", "ocr", "llm", "document-conversion", "ai", "gpt", "gemini"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Markup",
+    "Topic :: Utilities",
+]
+packages = [{include = "autoscan"}]
 [tool.poetry.scripts]
 autoscan = "autoscan.cli:main"
 
@@ -11,15 +29,14 @@ autoscan = "autoscan.cli:main"
 python = "^3.12"
 pdf2image = "^1.17.0"
 litellm = "==1.67.1"
-openai = "^1.57.0"
 aiofiles = "^24.1.0"
-tiktoken = "==0.9.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
 aioresponses = "^0.7.7"
 pytest-asyncio = "^0.25.0"
 pytest = "^8.3.4"
+twine = "^6.1.0"
 
 [build-system]
 requires = ["poetry-core"]

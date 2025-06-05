@@ -1,6 +1,3 @@
-from typing import Dict
-from litellm import model_cost, get_max_tokens, cost_per_token
-
 class PDF2ImageConversionConfig:
     NUM_THREADS = 4
     FORMAT = "png"
@@ -17,22 +14,3 @@ class PDF2ImageConversionConfig:
             return cls.DPI_HIGH
         else:  # "low", "medium"
             return cls.DPI_LOW
-
-class LLMConfig:
-    DEFAULT_MODEL = "openai/gpt-4o"
-
-    
-    @classmethod
-    def get_costs_for_model(cls, model: str, input_tokens: int, completion_tokens: int) -> float:
-        """
-        Calculate the total cost for a given model based on input and completion tokens.
-        """
-        try:
-            prompt_cost, completion_cost = cost_per_token(
-                model=model,
-                prompt_tokens=input_tokens,
-                completion_tokens=completion_tokens
-            )
-            return prompt_cost + completion_cost
-        except Exception as e:
-            raise ValueError(f"Error retrieving cost for model '{model}': {e}")

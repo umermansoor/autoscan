@@ -12,6 +12,7 @@ AutoScan converts PDF files into Markdown using LLMs (GPT-4o, Gemini, etc.) with
 - **Multiple LLM support** via [LiteLLM](https://github.com/BerriAI/litellm)
 - **Adaptive DPI settings** (150-200 DPI) automatically optimized for accuracy level
 - **Flexible accuracy levels** (low=fast/concurrent, high=accurate/sequential)
+- **Output polishing** (optional) for professional formatting via additional LLM pass
 
 ![Example 1](assets/pdf_to_md_eg_1.png)
 ![Example 2](assets/pdf_to_md_eg_2.png)
@@ -27,6 +28,14 @@ AutoScan converts PDF files into Markdown using LLMs (GPT-4o, Gemini, etc.) with
   - **Windows**: `choco install poppler` or `scoop install poppler`
 
 ### Installation
+
+#### Option 1: Install from PyPI (Recommended)
+
+```bash
+pip install autoscan
+```
+
+#### Option 2: Install from Source
 
 ```bash
 git clone https://github.com/umermansoor/autoscan.git
@@ -84,7 +93,29 @@ autoscan --model gemini/gemini-2.0-flash path/to/your/file.pdf
 
 # Provide additional instructions for the LLM:
 autoscan --instructions "This is an invoice; skip disclaimers" path/to/your/file.pdf
+
+# Apply additional LLM pass to improve formatting and document structure:
+autoscan --polish-output path/to/your/file.pdf
 ```
+
+### Output Polishing
+
+AutoScan includes an optional **output polishing** feature that applies an additional LLM pass to improve the formatting and presentation of the generated Markdown. When enabled with `--polish-output`, the system performs a second LLM pass that:
+
+- **Cleans up formatting inconsistencies** from the page-by-page conversion process
+- **Reconstructs broken tables** and ensures proper column alignment
+- **Merges fragmented content** that may have been split across pages
+- **Eliminates duplicate headers, footers, and page numbers**
+- **Improves document structure** with consistent heading hierarchies
+- **Restores natural text flow** by fixing fragmented sentences and paragraphs
+
+**When to use:**
+- Complex multi-page documents with tables spanning pages
+- Documents with inconsistent formatting or broken layouts
+- When you need publication-ready output with professional formatting
+- Reports, invoices, or technical documents requiring precise structure
+
+**Cost impact:** Adds one additional LLM call processing the entire document (typically 10-30% of total cost)
 
 ### Accuracy Levels
 
@@ -155,7 +186,7 @@ Configure models and other parameters using the `autoscan` function signature:
 async def autoscan(
     pdf_path: str,
     model_name: str = "openai/gpt-4o",
-    accuracy: str = "medium",
+    accuracy: str = "high",
     user_instructions: Optional[str] = None,
     temp_dir: Optional[str] = None,
     concurrency: Optional[int] = 10,
@@ -185,6 +216,9 @@ autoscan --accuracy high --model openai/gpt-4o examples/table.pdf
 
 # Process with custom instructions
 autoscan --instructions "Format as GitHub-flavored markdown tables" examples/table.pdf
+
+# Enable output polishing for professional formatting
+autoscan --polish-output examples/table.pdf
 
 # Debug mode - save all LLM interactions
 autoscan --save-llm-calls --model gemini/gemini-2.0-flash examples/table.pdf
