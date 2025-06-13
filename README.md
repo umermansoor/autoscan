@@ -79,6 +79,9 @@ autoscan --prompt "Skip disclaimers" yourfile.pdf
 
 # Polish output formatting
 autoscan --polish-output yourfile.pdf
+
+# Process only specific pages
+autoscan --first-page 5 --last-page 10 yourfile.pdf
 ```
 
 Markdown files are saved in the `output/` directory.
@@ -131,6 +134,8 @@ async def autoscan(
     concurrency: int = 10,                  # Max concurrent API calls (low accuracy only)
     save_llm_calls: bool = False,           # Save prompts/responses for debugging
     polish_output: bool = False,            # Apply additional formatting pass
+    first_page: int = None,                 # First page to process (defaults to beginning)
+    last_page: int = None,                  # Last page to process (defaults to end)
 ) -> AutoScanOutput
 ```
 

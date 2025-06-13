@@ -16,6 +16,8 @@ async def _process_file(
     save_llm_calls: bool = False,
     temp_dir: str | None = None,
     polish_output: bool = False,
+    first_page: int | None = None,
+    last_page: int | None = None,
 ) -> None:
     await autoscan(
         pdf_path=pdf_path,
@@ -26,6 +28,8 @@ async def _process_file(
         save_llm_calls=save_llm_calls,
         temp_dir=temp_dir,
         polish_output=polish_output,
+        first_page=first_page,
+        last_page=last_page,
     )
 
 async def _run(
@@ -37,9 +41,11 @@ async def _run(
     save_llm_calls: bool = False,
     temp_dir: str | None = None,
     polish_output: bool = False,
+    first_page: int | None = None,
+    last_page: int | None = None,
 ) -> None:
     if pdf_path:
-        await _process_file(pdf_path, model, accuracy, prompt, output_dir, save_llm_calls, temp_dir, polish_output)
+        await _process_file(pdf_path, model, accuracy, prompt, output_dir, save_llm_calls, temp_dir, polish_output, first_page, last_page)
     else:
         logging.error("No valid input provided. Use --help for usage information.")
         sys.exit(1)
@@ -95,6 +101,16 @@ def main() -> None:
         action="store_true",
         help="Apply additional LLM pass to improve formatting and document structure",
     )
+    parser.add_argument(
+        "--first-page",
+        type=int,
+        help="First page to process (defaults to processing from the beginning)",
+    )
+    parser.add_argument(
+        "--last-page",
+        type=int,
+        help="Last page to process before stopping (defaults to processing to the end)",
+    )
 
     args = parser.parse_args()
 
@@ -129,6 +145,8 @@ def main() -> None:
             save_llm_calls=args.save_llm_calls,
             temp_dir=args.temp_dir,
             polish_output=args.polish_output,
+            first_page=args.first_page,
+            last_page=args.last_page,
         )
     )
 

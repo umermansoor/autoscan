@@ -26,6 +26,8 @@ async def autoscan(
     concurrency: Optional[int] = 10,
     save_llm_calls: bool = False,
     polish_output: bool = False,
+    first_page: Optional[int] = None,
+    last_page: Optional[int] = None,
 ) -> AutoScanOutput:
     """
     Convert a PDF to markdown by:
@@ -44,6 +46,8 @@ async def autoscan(
     - `concurrency` (int, optional): Maximum number of concurrent model calls. Defaults to 10.
     - `save_llm_calls` (bool, optional): Whether to save LLM calls to a file. Defaults to False.
     - `polish_output` (bool, optional): Whether to apply an additional LLM pass to improve formatting, fix broken tables, and enhance document structure. Defaults to False.
+    - `first_page` (int, optional): First page to process, defaults to None (process from beginning).
+    - `last_page` (int, optional): Last page to process before stopping, defaults to None (process to end).
 
     Returns:
         AutoScanOutput: Contains completion time, markdown file path, markdown content, and token usage.
@@ -70,7 +74,7 @@ async def autoscan(
 
         # Convert PDF to images (Each page becomes separate image)
         pdf_conversion_start = datetime.now()
-        images = await asyncio.to_thread(pdf_to_images, local_path, temp_directory, accuracy)
+        images = await asyncio.to_thread(pdf_to_images, local_path, temp_directory, accuracy, first_page, last_page)
         if not images:
             raise PDFPageToImageConversionError("Failed to convert PDF pages to images.")
         
