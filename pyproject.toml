@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autoscan"
-version = "0.1.0"
+version = "0.1.1"
 description = "High fidelity PDF to Markdown conversion using LLMs (GPT-4o, Gemini, etc.)"
 authors = ["Umer Mansoor <umermk3@gmail.com>"]
 readme = "README.md"
