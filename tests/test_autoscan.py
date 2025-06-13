@@ -210,6 +210,13 @@ def test_pdf_to_images_page_parameters(mock_convert):
     pdf_to_images("/fake/test.pdf", "/fake/temp", "high", first_page=5)
     assert mock_convert.call_args[1]['first_page'] == 5
     assert mock_convert.call_args[1]['last_page'] is None
+    
+    mock_convert.reset_mock()
+    
+    # Test with only last_page
+    pdf_to_images("/fake/test.pdf", "/fake/temp", "high", last_page=3)
+    assert mock_convert.call_args[1]['first_page'] is None
+    assert mock_convert.call_args[1]['last_page'] == 3
 
 
 # ============================================================================
