@@ -192,6 +192,26 @@ def test_pdf_to_images_dpi_usage(mock_convert):
     assert mock_convert.call_args[1]['dpi'] == 150
 
 
+@patch('autoscan.image_processing.convert_from_path')
+def test_pdf_to_images_page_parameters(mock_convert):
+    """Test that pdf_to_images correctly passes page range parameters."""
+    from autoscan.image_processing import pdf_to_images
+    
+    mock_convert.return_value = ["/fake/page2.png", "/fake/page3.png"]
+    
+    # Test with both first_page and last_page
+    pdf_to_images("/fake/test.pdf", "/fake/temp", "high", first_page=2, last_page=3)
+    assert mock_convert.call_args[1]['first_page'] == 2
+    assert mock_convert.call_args[1]['last_page'] == 3
+    
+    mock_convert.reset_mock()
+    
+    # Test with only first_page
+    pdf_to_images("/fake/test.pdf", "/fake/temp", "high", first_page=5)
+    assert mock_convert.call_args[1]['first_page'] == 5
+    assert mock_convert.call_args[1]['last_page'] is None
+
+
 # ============================================================================
 # ERROR CONDITIONS AND EDGE CASES
 # ============================================================================
