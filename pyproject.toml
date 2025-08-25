@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autoscan"
-version = "0.1.1"
+version = "0.1.2"
 description = "High fidelity PDF to Markdown conversion using LLMs (GPT-4o, Gemini, etc.)"
 authors = ["Umer Mansoor <umermk3@gmail.com>"]
 readme = "README.md"
@@ -28,7 +28,7 @@ autoscan = "autoscan.cli:main"
 [tool.poetry.dependencies]
 python = "^3.12"
 pdf2image = "^1.17.0"
-litellm = "==1.67.1"
+litellm = "==1.76.0"
 aiofiles = "^24.1.0"
 
 [tool.poetry.group.dev.dependencies]
